@@ -1,154 +1,148 @@
-# 🧭 PmGen — Toshiba e-STUDIO Preventive Maintenance Generator
+# PmGen
 
-**PmGen** is a modern Python 3.13 application (PyQt6) that automates the generation of preventive-maintenance (PM) parts lists for Toshiba e-STUDIO MFP devices.
+PmGen is a Windows desktop application for generating preventive maintenance part recommendations from Toshiba e-STUDIO service reports. It signs into Toshiba eService, downloads PM Support and 08 Setting Mode data, parses wear counters, applies a catalog-driven rules pipeline, checks local inventory, resolves PM unit codes to orderable part numbers, and produces text, PDF, Excel, and bulk summary outputs.
 
-It fetches official **PM Support Code List** reports, applies rule-based logic to determine due items, resolves part numbers via a local database, and can cross-reference results against your local **Inventory** to generate precise "Order Lists" versus "In-Stock" matches.
+## Features
 
----
+- Single-serial PM report generation from Toshiba eService data.
+- Bulk processing for active serials with background worker threads.
+- Catalog-driven model, PM unit, canon mapping, per-color unit, and quantity override logic.
+- Inventory CSV import, editing, caching, and stock coverage checks.
+- RIBON Access database lookup for PM unit code to part-number resolution.
+- Individual report PDFs and consolidated bulk `Final_Summary.pdf` generation.
+- GitHub-release updater with ZIP checksum validation, safe extraction, install locking, and rollback.
+- Rolling diagnostic logs for app and updater troubleshooting.
 
-## ✨ New in this Version
+## Documentation
 
-| Feature                     | Description                                                                                                                                            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **📦 Inventory System**     | A dedicated **Inventory Tab** allows you to import stock CSVs, manually add/edit items, and track total stock value.                                   |
-| **✅ Stock Reconciliation** | The report engine now checks your inventory cache. Reports automatically split items into **"Inventory Matches (In Stock)"** and **"Items to Order"**. |
-| **📅 Smart Bulk Filters**   | The Bulk Runner now supports **Unpack Date filtering**. You can exclude machines that are too new (< X months) or too old (> X months).                |
-| **🖥️ Modern UI**            | A custom frameless interface with tabbed navigation ("Home" vs "Inventory"), auto-complete for serials, and a colorized output editor.                 |
+Full project documentation is available in [docs/project-summary.md](docs/project-summary.md) and [docs/project-summary.docx](docs/project-summary.docx).
 
----
+Architecture diagrams are stored as editable draw.io files and exported PNGs under [docs/diagrams](docs/diagrams):
 
-## 🚀 Features Overview
+- [docs/diagrams/high-level-architecture.drawio.png](docs/diagrams/high-level-architecture.drawio.png)
+- [docs/diagrams/processing-pipeline.drawio.png](docs/diagrams/processing-pipeline.drawio.png)
+- [docs/diagrams/component-relationships.drawio.png](docs/diagrams/component-relationships.drawio.png)
+- [docs/diagrams/data-model.drawio.png](docs/diagrams/data-model.drawio.png)
+- [docs/diagrams/deployment-infrastructure.drawio.png](docs/diagrams/deployment-infrastructure.drawio.png)
 
-- **Smart Parsing:** Fetches and parses PM Support Code Lists from Toshiba Elevate Sky / e-Service.
-- **Rule Engine:** Applies a pipeline of logic:
+## Requirements
 
-1. **Life Calculation:** Flags items based on % life used (Page or Drive basis).
-2. **Canon Mapping:** Normalizes varying descriptor names (e.g., `DRUM[Y]`) to standard codes.
-3. **Part Resolution:** Resolves generic kit codes to specific Part Numbers using `Ribon.accdb`.
-4. **Inventory Check:** Compares needed parts against local stock levels.
+- Windows.
+- Python 3.11 or newer recommended.
+- Toshiba eService account access for live report downloads.
+- Microsoft Access ODBC driver for RIBON lookup support.
+- Local RIBON database access when part-number expansion is required.
+- Windows SDK `signtool.exe` and a code-signing certificate for release builds.
 
-- **Bulk Fleet Analysis:** Multi-threaded processing of hundreds of serials. Generates a consolidated PDF summary with color-coded stock status (Red=Missing, Yellow=Partial, Green=In Stock).
-- **Authentication:** Secure login with OS keyring support.
-- **Auto-Updater:** Integrated update checker to keep the tool current.
+Runtime dependencies are pinned in [requirements.txt](requirements.txt).
 
----
+## Setup
 
-## 🧱 Architecture & Logic Flow
+Run these commands from the repository root:
 
-The system now operates on a **Tabbed** workflow:
-
-1. **Inventory Tab:** Manage your stock.
-
-- Load CSVs (currently only supports EAutomate csv export) or manually add rows.
-- Data is cached locally to `inventory_cache.csv`.
-
-2. **Home Tab:** Generate reports.
-
-- Enter Serial -> Fetch Data -> Run Rules -> Check Inventory -> Output Report.
-
-### The Rule Pipeline
-
-`run_rules.py` orchestrates the logic in this specific order:
-
-1. `GenericLifeRule`: Calculates life used vs threshold.
-2. `KitLinkRule`: Maps descriptors to Catalog Kit Codes.
-3. `UnitGroupingRule`: Groups items (e.g., Color Drums, Feed Rollers).
-4. `QtyOverrideRule`: Applies manual quantity fixes.
-5. **`InventoryCheckRule`**: Queries the loaded inventory cache to determine what is in stock vs missing.
-6. `RibonExpansionRule`: Finalizes part numbers.
-
-### Inventory Logic
-
-When generating a report, PmGen looks at `inventory_cache.csv`.
-
-- **Matches:** If you have the part, it appears under "Inventory Matches."
-- **Missing:** If you have 0 or partial quantity, it appears under "Items to Order."
-- **Summary PDF:** The bulk summary uses color codes:
-- 🟥 **Red:** 0 Stock (Need to order)
-- 🟨 **Yellow:** Partial Stock (Need to order balance)
-- 🟩 **Green:** Full Stock (No order needed)
-
----
-
-## ⚙️ Installation
-
-### Prerequisites
-
-- **Python 3.13+**
-- **Toshiba's RIBON.exe**
-
-### Install dependencies
-
-```bash
-pip install -r requirements.txt
-
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
----
+For development and tests, install the test tools used by the suite if they are not already present in the environment:
 
-## 🖥️ Usage Guide
+```powershell
+.\.venv\Scripts\python.exe -m pip install pytest pytest-qt openpyxl packaging
+```
 
-### 1. Inventory Management
+## Run From Source
 
-Go to the **Inventory** tab.
+Start the desktop app from the repository root so source-mode database lookup can find `catalog_manager.db` in the working directory:
 
-- **Import:** Load a CSV file (only supports EAutomate csv export).
-- **Edit:** Double-click cells to update Quantities or Costs.
-- **Add/Delete:** Use the toolbar buttons to manage rows manually.
-- _Note: Changes are auto-saved to your local cache._
+```powershell
+.\.venv\Scripts\python.exe -m pmgen.ui.app
+```
 
-### 2. Single Report (Home Tab)
+In a frozen build, the app bootstraps `catalog_manager.db` into the application AppData directory. In source runs, it uses the working-directory copy directly.
 
-1. Enter a **Serial Number** (Auto-complete remembers history).
-2. Click **Generate** (or press Enter).
-3. The output window displays:
+## Configuration
 
-- **Highest Wear Items:** Items exceeding the % threshold.
-- **Final Parts:** Total quantities needed.
-- **Inventory Matches:** Parts you already have.
-- **Items to Order:** Parts you need to buy.
+PmGen stores normal application settings through `QSettings`, saved Toshiba eService credentials through the OS credential store via `keyring`, and diagnostic logs under `~/.indybiz_pm`.
 
-### 3. Bulk Mode
+RIBON lookup uses environment/runtime configuration in [pmgen/io/ribon_db.py](pmgen/io/ribon_db.py). Configure `RIBON_DB_PATH` and `RIBON_DB_PASSWORD` in the local runtime environment rather than committing connection details.
 
-Go to **Bulk ▾ → Bulk Settings…**
+The inventory cache is stored as `inventory_cache.csv` in the application AppData directory. It is populated from the Inventory tab by importing an inventory CSV.
 
-- **Top N:** How many "most worn" machines to include in the summary.
-- **Pool Size:** Number of parallel download threads.
-- **Date Filters:**
-- `Exclude if OLDER than X months`: Ignores old machines (based on unpack date).
-- `Exclude if NEWER than X months`: Ignores brand new installs.
+## How It Works
 
-- **Run Bulk:** Processes the fleet and produces individual PDFs + `Final_Summary.pdf`.
+The main processing flow is:
 
----
+1. The UI starts a `SingleReportWorker` or `BulkRunner`.
+2. `SessionPool` logs into Toshiba eService and provides authenticated sessions.
+3. PM Support bytes are downloaded and parsed by `ParsePmReport()`.
+4. Raw unit descriptors are normalized with catalog regex mappings.
+5. `run_rules()` applies the rule pipeline: life calculation, kit linking, unit grouping, quantity overrides, inventory checks, and RIBON expansion.
+6. Report formatters generate UI text, individual PDFs, and bulk summaries.
 
-## 📊 Output Example
+The rule pipeline is defined in [pmgen/engine/run_rules.py](pmgen/engine/run_rules.py). Individual rule implementations live in [pmgen/rules](pmgen/rules).
 
-**Text Report (Home Tab):**
+## Project Structure
 
 ```text
-Highest Wear Items
-───────────────────────────────────────────────────────────────
-  • DRUM[K] — 112.5% → DUE
-      ↳ Unit: OD-FC505
-
-Inventory Matches (In Stock)
-───────────────────────────────────────────────────────────────
-(Matched Code → Needed → In Stock)
-  ✓ 6LK49015000 : Need 1 | Have 5
-
-Items to Order (Missing from Stock)
-───────────────────────────────────────────────────────────────
-(Code → Qty to Order)
-  ! 6LK50755000 : 2
-
+PmGen/
+|-- build_sign_zip.py          # PyInstaller build, signing, ZIP, and checksum pipeline
+|-- create_database.py         # Catalog seed data and canon mapping source
+|-- catalog_manager.db         # Bundled SQLite catalog
+|-- pmgen.spec                 # PyInstaller spec for app and updater
+|-- requirements.txt           # Pinned dependencies
+|-- pmgen/
+|   |-- canon/                 # Canonical unit normalization
+|   |-- catalog/               # Catalog helper models
+|   |-- engine/                # Rule orchestration and report formatting
+|   |-- io/                    # HTTP, SQLite, RIBON, and serial parsing integrations
+|   |-- parsing/               # PM Support report parser
+|   |-- rules/                 # Maintenance-selection rules
+|   |-- system/                # Logging, crash handlers, PyQt slot wrapper
+|   |-- ui/                    # PyQt6 application and UI workers
+|   |-- updater/               # GitHub updater and external install process
+|   |-- types.py               # Shared dataclass contracts
+|-- tests/                     # Regression, UI model, and updater tests
+|-- docs/                      # Project documentation and diagrams
 ```
 
-**Bulk Summary PDF:**
-Contains a "Traffic Light" table showing exactly what needs to be ordered for the entire fleet batch, factoring in your current shelf inventory.
+The `_internal/` directory mirrors packaged runtime content and should generally be treated as generated distribution support.
 
----
+## Tests
 
-## 🧾 License
+Run the full test suite from the repository root:
 
-**License:** Business Source License 1.1 (will convert to Apache 2.0 on 2028-11-05)
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+The tests cover full PM report fixture processing, stable rule metadata contracts, PDF summary generation, bulk worker date filtering, UI table model behavior, catalog editor behavior, main-window behavior, and updater hardening/rollback paths.
+
+## Build And Release
+
+Build the PyInstaller distribution directly with:
+
+```powershell
+.\.venv\Scripts\pyinstaller.exe --noconfirm --clean pmgen.spec
+```
+
+For the signed release ZIP and checksum workflow, use:
+
+```powershell
+.\.venv\Scripts\python.exe build_sign_zip.py
+```
+
+The release script expects a signing certificate at `helpers/IBSCert.pfx`, locates `signtool.exe`, signs generated binaries, creates `PmGen.zip`, and writes `PmGen.zip.sha256`. Publish both artifacts with the GitHub release so the updater can verify downloads.
+
+## Operational Notes
+
+- Keep catalog behavior data-driven through `catalog_manager.db` whenever possible.
+- Keep network work, PDF generation, and ODBC calls off the PyQt UI thread.
+- Keep `Selection.meta` keys stable because UI and report formatters consume them directly.
+- Do not commit local credentials, RIBON connection details, release certificate files, generated logs, or private inventory exports.
+- When updating report behavior, add or update fixtures in [tests/example_pm_reports](tests/example_pm_reports).
+
+## License
+
+See [LICENSE](LICENSE).

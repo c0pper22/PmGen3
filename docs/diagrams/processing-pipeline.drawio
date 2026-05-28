@@ -1,0 +1,74 @@
+<mxfile host="app.diagrams.net" modified="2026-05-28T00:00:00.000Z" agent="GitHub Copilot" version="24.7.17" type="device">
+  <diagram id="processing-pipeline" name="Processing Pipeline">
+    <mxGraphModel dx="1400" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="1220" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="PM Report Processing Pipeline" style="text;html=1;strokeColor=none;fillColor=none;fontSize=24;fontStyle=1;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1020" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="input" value="Input&lt;br&gt;Serial number or bulk active-serial queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="80" width="270" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="login" value="Authenticated Session&lt;br&gt;SessionPool logs into Toshiba eService" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="180" width="270" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="download" value="Download Service Files&lt;br&gt;PMSupport CSV + optional 08 Setting Mode" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="280" width="270" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="parse" value="ParsePmReport&lt;br&gt;headers, counters, PM items" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="380" width="270" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="canon" value="Canonicalize Units&lt;br&gt;canon_unit uses regex mappings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="480" width="270" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="life" value="GenericLifeRule&lt;br&gt;selects highest life used and due status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="590" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="kit" value="KitLinkRule&lt;br&gt;maps canon item to PM unit code" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="670" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="group" value="UnitGroupingRule&lt;br&gt;counts kits once per unit/color/tray" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="750" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="qty" value="QtyOverrideRule&lt;br&gt;applies catalog quantity overrides" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="830" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="inventory" value="InventoryCheckRule&lt;br&gt;separates covered and order-needed stock" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="910" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ribon" value="RibonExpansionRule&lt;br&gt;resolves PM units to part numbers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="990" width="270" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="output" value="Output&lt;br&gt;Selection.meta, text report, individual PDFs, bulk summary PDF" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="1080" width="270" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="catalog" value="catalog_manager.db&lt;br&gt;canon mappings, model catalog, overrides" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="520" width="220" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="inventory-store" value="Inventory cache&lt;br&gt;inventory_cache.csv" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="760" y="880" width="220" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="ribon-store" value="RIBON Access DB&lt;br&gt;PARTS_NAME_COM to PARTS_NO" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="760" y="990" width="220" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1" source="input" target="login"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1" source="login" target="download"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="bytes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1" source="download" target="parse"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="PmReport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="parse" target="canon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="Context" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="canon" target="life"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="findings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="life" target="kit"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="due findings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="kit" target="group"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" value="kit selection" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="group" target="qty"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="quantities" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="qty" target="inventory"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="inventory meta" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="inventory" target="ribon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" value="part-number meta" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d79b00;strokeWidth=2;" edge="1" parent="1" source="ribon" target="output"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-canon-catalog" value="loads regex mappings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="catalog" target="canon"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-kit-catalog" value="model to unit links" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="catalog" target="kit"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-group-catalog" value="unit contents + per-color flags" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="catalog" target="group"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-inv-store" value="stock lookup" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="inventory-store" target="inventory"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-ribon-store" value="ODBC query" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="ribon" target="ribon-store"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
