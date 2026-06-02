@@ -606,6 +606,7 @@ class UnitsTab(_EditorTabBase):
         self._db = db
         self._loading = False
         self._deleted_originals: Set[str] = set()
+        self._available_canon_items: Set[str] = set()
 
         root = QVBoxLayout(self)
         top = QHBoxLayout()
@@ -638,22 +639,10 @@ class UnitsTab(_EditorTabBase):
 
         right = QWidget()
         right_l = QVBoxLayout(right)
-        right_l.addWidget(QLabel("Items in selected unit"))
-
-        add_item_row = QHBoxLayout()
-        self.item_input = QLineEdit()
-        self.item_input.setPlaceholderText("Canon item")
-        self.btn_add_item = QPushButton("Add Item")
-        self.btn_remove_item = QPushButton("Delete Item")
-        self.btn_add_item.clicked.connect(self._add_item)
-        self.btn_remove_item.clicked.connect(self._remove_item)
-        add_item_row.addWidget(self.item_input, 1)
-        add_item_row.addWidget(self.btn_add_item)
-        add_item_row.addWidget(self.btn_remove_item)
-        right_l.addLayout(add_item_row)
-
-        self.item_list = QListWidget()
-        right_l.addWidget(self.item_list, 1)
+        right_l.addWidget(QLabel("Canon items in selected unit"))
+        self.item_checks = QListWidget()
+        self.item_checks.itemChanged.connect(self._on_items_changed)
+        right_l.addWidget(self.item_checks, 1)
 
         splitter.addWidget(self.unit_table)
         splitter.addWidget(right)
@@ -711,48 +700,67 @@ class UnitsTab(_EditorTabBase):
         cell.setData(Qt.ItemDataRole.UserRole, set(items))
 
     def _on_unit_selected(self, *_args):
-        self._populate_item_list()
+        self._populate_item_checks_for_selection()
 
-    def _populate_item_list(self):
-        self.item_list.clear()
+    def _load_available_canon_items(self):
+        self._available_canon_items = set(self._db.get_available_canon_items())
+
+    @staticmethod
+    def _sort_canon_items(items: Set[str]) -> List[str]:
+        return sorted(items, key=lambda value: (value.upper(), value))
+
+    def _populate_item_checks_for_selection(self):
+        self.item_checks.blockSignals(True)
+        self.item_checks.clear()
+
+        row = self._current_row()
+        if row < 0:
+            self.item_checks.blockSignals(False)
+            return
+
+        selected = self._get_row_items(row)
+        stale_selected = selected - self._available_canon_items
+
+        for value in self._sort_canon_items(self._available_canon_items):
+            item = QListWidgetItem(value)
+            item.setData(Qt.ItemDataRole.UserRole, value)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if value in selected else Qt.CheckState.Unchecked)
+            self.item_checks.addItem(item)
+
+        for value in self._sort_canon_items(stale_selected):
+            item = QListWidgetItem(f"{value} (not in Canon Mappings)")
+            item.setData(Qt.ItemDataRole.UserRole, value)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked)
+            self.item_checks.addItem(item)
+
+        self.item_checks.blockSignals(False)
+
+    def _on_items_changed(self, _item: QListWidgetItem):
+        if self._loading:
+            return
         row = self._current_row()
         if row < 0:
             return
-        for item in sorted(self._get_row_items(row)):
-            self.item_list.addItem(item)
-
-    def _add_item(self):
-        row = self._current_row()
-        if row < 0:
-            return
-        value = (self.item_input.text() or "").strip()
-        if not value:
-            return
-        items = self._get_row_items(row)
-        items.add(value)
-        self._set_row_items(row, items)
-        self._populate_item_list()
-        self.item_input.clear()
+        selected: Set[str] = set()
+        for i in range(self.item_checks.count()):
+            item = self.item_checks.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                value = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
+                if value:
+                    selected.add(value)
+        self._set_row_items(row, selected)
         self._set_dirty(True)
 
-    def _remove_item(self):
-        row = self._current_row()
-        if row < 0:
-            return
-        selected = self.item_list.currentItem()
-        if not selected:
-            return
-        value = selected.text()
-        items = self._get_row_items(row)
-        if value in items:
-            items.remove(value)
-            self._set_row_items(row, items)
-            self._populate_item_list()
-            self._set_dirty(True)
+    def refresh_available_canon_items(self):
+        self._load_available_canon_items()
+        self._populate_item_checks_for_selection()
 
     def load_data(self):
         self._loading = True
         self._deleted_originals.clear()
+        self._load_available_canon_items()
         self.unit_table.setRowCount(0)
 
         for unit_name in self._db.get_all_units():
@@ -769,7 +777,7 @@ class UnitsTab(_EditorTabBase):
         if self.unit_table.rowCount() > 0:
             self.unit_table.setCurrentCell(0, 1)
         self._loading = False
-        self._populate_item_list()
+        self._populate_item_checks_for_selection()
         self._set_dirty(False)
 
     def _validate(self) -> Optional[str]:
@@ -781,9 +789,17 @@ class UnitsTab(_EditorTabBase):
             if unit in seen:
                 return f"Row {row + 1}: Duplicate PM Unit '{unit}'."
             seen.add(unit)
+
+            missing_items = self._get_row_items(row) - self._available_canon_items
+            if missing_items:
+                preview = ", ".join(self._sort_canon_items(missing_items)[:5])
+                if len(missing_items) > 5:
+                    preview += f", and {len(missing_items) - 5} more"
+                return f"Row {row + 1}: Canon item(s) not found in Canon Mappings: {preview}."
         return None
 
     def save_changes(self):
+        self._load_available_canon_items()
         err = self._validate()
         if err:
             CustomMessageBox.warn(self, "Validation Error", err, self._icon_dir)
@@ -818,22 +834,18 @@ class PerColorUnitsTab(_EditorTabBase):
         self._db = db
         self._loading = False
         self._original_values: Set[str] = set()
+        self._selected_values: Set[str] = set()
+        self._available_units: Set[str] = set()
 
         root = QVBoxLayout(self)
         top = QHBoxLayout()
         title = QLabel("PM Units counted once per color channel")
         title.setObjectName("DialogLabel")
         top.addWidget(title, 1)
-        self.btn_add = QPushButton("Add")
-        self.btn_remove = QPushButton("Delete")
         self.btn_save = QPushButton("Save")
         self.btn_discard = QPushButton("Discard")
-        self.btn_add.clicked.connect(self._add_row)
-        self.btn_remove.clicked.connect(self._remove_row)
         self.btn_save.clicked.connect(self.save_changes)
         self.btn_discard.clicked.connect(self.load_data)
-        top.addWidget(self.btn_add)
-        top.addWidget(self.btn_remove)
         top.addWidget(self.btn_save)
         top.addWidget(self.btn_discard)
         root.addLayout(top)
@@ -846,61 +858,89 @@ class PerColorUnitsTab(_EditorTabBase):
         helper.setWordWrap(True)
         root.addWidget(helper)
 
-        self.table = QTableWidget(0, 1)
-        self.table.setHorizontalHeaderLabels(["PM Unit"])
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.itemChanged.connect(self._on_item_changed)
-        root.addWidget(self.table, 1)
+        self.unit_checks = QListWidget()
+        self.unit_checks.itemChanged.connect(self._on_unit_check_changed)
+        root.addWidget(self.unit_checks, 1)
 
         self.load_data()
 
-    def _on_item_changed(self, item: QTableWidgetItem):
+    @staticmethod
+    def _sort_units(units: Set[str]) -> List[str]:
+        return sorted(units, key=lambda value: (value.upper(), value))
+
+    def _load_available_units(self):
+        self._available_units = set(self._db.get_all_units())
+
+    def _populate_unit_checks(self):
+        self.unit_checks.blockSignals(True)
+        self.unit_checks.clear()
+
+        stale_values = self._selected_values - self._available_units
+
+        for value in self._sort_units(self._available_units):
+            item = QListWidgetItem(value)
+            item.setData(Qt.ItemDataRole.UserRole, value)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if value in self._selected_values else Qt.CheckState.Unchecked)
+            self.unit_checks.addItem(item)
+
+        for value in self._sort_units(stale_values):
+            item = QListWidgetItem(f"{value} (not in PM Units)")
+            item.setData(Qt.ItemDataRole.UserRole, value)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked)
+            self.unit_checks.addItem(item)
+
+        self.unit_checks.blockSignals(False)
+
+    def _on_unit_check_changed(self, _item: QListWidgetItem):
         if self._loading:
             return
-        item.setText((item.text() or "").strip())
-        self._set_dirty(True)
-
-    def _add_row(self):
-        row = self.table.rowCount()
-        self.table.insertRow(row)
-        self.table.setItem(row, 0, QTableWidgetItem(""))
-        self._set_dirty(True)
-
-    def _remove_row(self):
-        row = self.table.currentRow()
-        if row < 0:
-            return
-        self.table.removeRow(row)
+        self._selected_values = self._current_values()
         self._set_dirty(True)
 
     def load_data(self):
         self._loading = True
-        self.table.setRowCount(0)
+        self._load_available_units()
         values = self._db.get_per_color_units()
-        for value in values:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(value))
         self._original_values = set(values)
+        self._selected_values = set(values)
+        self._populate_unit_checks()
         self._loading = False
         self._set_dirty(False)
 
     def _current_values(self) -> Set[str]:
         out: Set[str] = set()
-        for row in range(self.table.rowCount()):
-            value = (self.table.item(row, 0).text() if self.table.item(row, 0) else "").strip()
-            if value:
-                out.add(value)
+        for i in range(self.unit_checks.count()):
+            item = self.unit_checks.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                value = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
+                if value:
+                    out.add(value)
         return out
 
+    def refresh_available_units(self):
+        self._selected_values = self._current_values() if self.is_dirty else set(self._original_values)
+        self._load_available_units()
+        self._populate_unit_checks()
+
+    def _validate(self) -> Optional[str]:
+        missing_units = self._current_values() - self._available_units
+        if missing_units:
+            preview = ", ".join(self._sort_units(missing_units)[:5])
+            if len(missing_units) > 5:
+                preview += f", and {len(missing_units) - 5} more"
+            return f"PM Unit(s) not found in PM Units: {preview}."
+        return None
+
     def save_changes(self):
-        current = self._current_values()
-        if not current and self.table.rowCount() > 0:
-            CustomMessageBox.warn(self, "Validation Error", "PM Unit names cannot be blank.", self._icon_dir)
+        self._load_available_units()
+        err = self._validate()
+        if err:
+            CustomMessageBox.warn(self, "Validation Error", err, self._icon_dir)
             return
+
+        current = self._current_values()
 
         try:
             for removed in sorted(self._original_values - current):
@@ -919,32 +959,29 @@ class QtyOverridesTab(_EditorTabBase):
         self._db = db
         self._loading = False
         self._original: Dict[str, int] = {}
+        self._selected_overrides: Dict[str, int] = {}
+        self._available_units: Set[str] = set()
 
         root = QVBoxLayout(self)
         top = QHBoxLayout()
         top.addWidget(QLabel("PM Unit fixed quantity overrides"), 1)
-        self.btn_add = QPushButton("Add")
-        self.btn_remove = QPushButton("Delete")
         self.btn_save = QPushButton("Save")
         self.btn_discard = QPushButton("Discard")
-        self.btn_add.clicked.connect(self._add_row)
-        self.btn_remove.clicked.connect(self._remove_row)
         self.btn_save.clicked.connect(self.save_changes)
         self.btn_discard.clicked.connect(self.load_data)
-        top.addWidget(self.btn_add)
-        top.addWidget(self.btn_remove)
         top.addWidget(self.btn_save)
         top.addWidget(self.btn_discard)
         root.addLayout(top)
 
-        self.table = QTableWidget(0, 2)
-        self.table.setHorizontalHeaderLabels(["PM Unit", "Quantity"])
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Override", "PM Unit", "Quantity"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setColumnWidth(0, 420)
-        self.table.setColumnWidth(1, 120)
+        self.table.setColumnWidth(0, 90)
+        self.table.setColumnWidth(1, 420)
+        self.table.setColumnWidth(2, 120)
         self.table.itemChanged.connect(self._on_item_changed)
         root.addWidget(self.table, 1)
 
@@ -953,46 +990,74 @@ class QtyOverridesTab(_EditorTabBase):
     def _on_item_changed(self, item: QTableWidgetItem):
         if self._loading:
             return
-        if item.column() == 0:
-            item.setText((item.text() or "").strip())
-        else:
+        if item.column() == 2:
             txt = (item.text() or "").strip()
             if txt and not txt.isdigit():
                 item.setText("0")
+        current = self._current_values()
+        if current is not None:
+            self._selected_overrides = dict(current)
         self._set_dirty(True)
 
-    def _add_row(self):
+    @staticmethod
+    def _sort_units(units: Set[str]) -> List[str]:
+        return sorted(units, key=lambda value: (value.upper(), value))
+
+    def _load_available_units(self):
+        self._available_units = set(self._db.get_all_units())
+
+    def _insert_override_row(self, unit_name: str, quantity: int, checked: bool, stale: bool = False):
         row = self.table.rowCount()
         self.table.insertRow(row)
-        self.table.setItem(row, 0, QTableWidgetItem(""))
-        self.table.setItem(row, 1, QTableWidgetItem("0"))
-        self._set_dirty(True)
 
-    def _remove_row(self):
-        row = self.table.currentRow()
-        if row < 0:
-            return
-        self.table.removeRow(row)
-        self._set_dirty(True)
+        override_item = QTableWidgetItem("")
+        override_item.setData(Qt.ItemDataRole.UserRole, unit_name)
+        override_item.setFlags((override_item.flags() | Qt.ItemFlag.ItemIsUserCheckable) & ~Qt.ItemFlag.ItemIsEditable)
+        override_item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+        self.table.setItem(row, 0, override_item)
+
+        label = f"{unit_name} (not in PM Units)" if stale else unit_name
+        unit_item = QTableWidgetItem(label)
+        unit_item.setData(Qt.ItemDataRole.UserRole, unit_name)
+        unit_item.setFlags(unit_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.table.setItem(row, 1, unit_item)
+
+        qty_item = QTableWidgetItem(str(quantity))
+        self.table.setItem(row, 2, qty_item)
+
+    def _populate_table(self):
+        self.table.blockSignals(True)
+        self.table.setRowCount(0)
+
+        stale_units = set(self._selected_overrides.keys()) - self._available_units
+        for unit_name in self._sort_units(self._available_units):
+            quantity = self._selected_overrides.get(unit_name, 1)
+            self._insert_override_row(unit_name, quantity, unit_name in self._selected_overrides)
+
+        for unit_name in self._sort_units(stale_units):
+            quantity = self._selected_overrides.get(unit_name, 1)
+            self._insert_override_row(unit_name, quantity, True, stale=True)
+
+        self.table.blockSignals(False)
 
     def load_data(self):
         self._loading = True
-        self.table.setRowCount(0)
+        self._load_available_units()
         overrides = self._db.get_qty_overrides()
-        for unit_name, quantity in sorted(overrides.items()):
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(unit_name))
-            self.table.setItem(row, 1, QTableWidgetItem(str(quantity)))
         self._original = dict(overrides)
+        self._selected_overrides = dict(overrides)
+        self._populate_table()
         self._loading = False
         self._set_dirty(False)
 
     def _current_values(self) -> Optional[Dict[str, int]]:
         values: Dict[str, int] = {}
         for row in range(self.table.rowCount()):
-            unit = (self.table.item(row, 0).text() if self.table.item(row, 0) else "").strip()
-            qty_text = (self.table.item(row, 1).text() if self.table.item(row, 1) else "").strip()
+            override_item = self.table.item(row, 0)
+            if not override_item or override_item.checkState() != Qt.CheckState.Checked:
+                continue
+            unit = str(override_item.data(Qt.ItemDataRole.UserRole) or "").strip()
+            qty_text = (self.table.item(row, 2).text() if self.table.item(row, 2) else "").strip()
             if not unit:
                 return None
             if not qty_text.isdigit():
@@ -1003,11 +1068,39 @@ class QtyOverridesTab(_EditorTabBase):
             values[unit] = qty
         return values
 
-    def save_changes(self):
+    def refresh_available_units(self):
+        if self.is_dirty:
+            current = self._current_values()
+            if current is None:
+                return
+            self._selected_overrides = dict(current)
+        else:
+            self._selected_overrides = dict(self._original)
+        self._load_available_units()
+        self._populate_table()
+
+    def _validate(self) -> Optional[str]:
         current = self._current_values()
         if current is None:
-            CustomMessageBox.warn(self, "Validation Error", "Each row needs a PM Unit and numeric quantity.", self._icon_dir)
+            return "Checked rows need a numeric quantity."
+
+        missing_units = set(current.keys()) - self._available_units
+        if missing_units:
+            preview = ", ".join(self._sort_units(missing_units)[:5])
+            if len(missing_units) > 5:
+                preview += f", and {len(missing_units) - 5} more"
+            return f"PM Unit(s) not found in PM Units: {preview}."
+
+        return None
+
+    def save_changes(self):
+        self._load_available_units()
+        err = self._validate()
+        if err:
+            CustomMessageBox.warn(self, "Validation Error", err, self._icon_dir)
             return
+
+        current = self._current_values() or {}
 
         try:
             for removed in sorted(set(self._original.keys()) - set(current.keys())):
@@ -1081,7 +1174,7 @@ class CatalogEditorWindow(QMainWindow):
         content_layout.setContentsMargins(8, 8, 8, 8)
         content_layout.setSpacing(6)
 
-        self.header = QLabel("Edit canon mappings, models, per-color units, PM units, and quantity overrides", content)
+        self.header = QLabel("Edit models, PM units, canon mappings, per-color units, and quantity overrides", content)
         self.header.setObjectName("DialogLabel")
         content_layout.addWidget(self.header)
 
@@ -1094,9 +1187,9 @@ class CatalogEditorWindow(QMainWindow):
         self.tab_per_color = PerColorUnitsTab(self._db, self._icon_dir, self)
         self.tab_qty = QtyOverridesTab(self._db, self._icon_dir, self)
 
-        self.tabs.addTab(self.tab_canon, "Canon Mappings")
         self.tabs.addTab(self.tab_models, "Models")
         self.tabs.addTab(self.tab_units, "PM Units")
+        self.tabs.addTab(self.tab_canon, "Canon Mappings")
         per_color_idx = self.tabs.addTab(self.tab_per_color, "Per Color Units")
         self.tabs.addTab(self.tab_qty, "Quantity Overrides")
         self.tabs.setTabToolTip(
@@ -1122,6 +1215,12 @@ class CatalogEditorWindow(QMainWindow):
     def _on_tab_changed(self, index: int):
         if self.tabs.widget(index) is self.tab_models:
             self.tab_models.refresh_available_units()
+        elif self.tabs.widget(index) is self.tab_units:
+            self.tab_units.refresh_available_canon_items()
+        elif self.tabs.widget(index) is self.tab_per_color:
+            self.tab_per_color.refresh_available_units()
+        elif self.tabs.widget(index) is self.tab_qty:
+            self.tab_qty.refresh_available_units()
 
     def _any_dirty(self) -> bool:
         return any(

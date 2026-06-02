@@ -1,5 +1,6 @@
 import sqlite3
-from typing import Dict, List, Tuple
+import string
+from typing import Dict, List, Set, Tuple
 
 from pmgen.io.http_client import get_db_path
 
@@ -388,6 +389,8 @@ class CatalogDB:
     # CANON MAPPINGS (Regex)
     # =========================================================================
 
+    _CHANNEL_VALUES = ("K", "C", "M", "Y")
+
     def get_mappings(self) -> List[Tuple[int, str, str]]:
         conn = self._get_conn()
         try:
@@ -397,6 +400,53 @@ class CatalogDB:
             except sqlite3.OperationalError:
                 cur.execute("SELECT rowid, pattern, template FROM canon_mappings ORDER BY pattern, rowid")
             return cur.fetchall()
+        finally:
+            conn.close()
+
+    @classmethod
+    def _expand_canon_template(cls, template: str) -> Set[str]:
+        template_norm = (template or "").strip()
+        if not template_norm:
+            return set()
+
+        try:
+            fields = {
+                field_name.split("!", 1)[0].split(":", 1)[0]
+                for _literal, field_name, _format_spec, _conversion in string.Formatter().parse(template_norm)
+                if field_name
+            }
+        except ValueError:
+            return {template_norm}
+
+        if not fields:
+            return {template_norm}
+
+        if fields == {"chan"}:
+            expanded: Set[str] = set()
+            for channel in cls._CHANNEL_VALUES:
+                try:
+                    expanded.add(template_norm.format(chan=channel))
+                except (KeyError, ValueError):
+                    return {template_norm}
+            return expanded
+
+        return {template_norm}
+
+    def get_available_canon_items(self) -> List[str]:
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT DISTINCT template FROM canon_mappings
+                WHERE TRIM(COALESCE(template, '')) <> ''
+                ORDER BY template COLLATE NOCASE, template
+                """
+            )
+            items: Set[str] = set()
+            for (template,) in cur.fetchall():
+                items.update(self._expand_canon_template(template))
+            return sorted(items, key=lambda value: (value.upper(), value))
         finally:
             conn.close()
 
