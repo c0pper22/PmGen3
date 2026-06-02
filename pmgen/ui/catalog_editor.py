@@ -1174,12 +1174,26 @@ class CatalogEditorWindow(QMainWindow):
         content_layout.setContentsMargins(8, 8, 8, 8)
         content_layout.setSpacing(6)
 
+        header_row = QHBoxLayout()
         self.header = QLabel("Edit models, PM units, canon mappings, per-color units, and quantity overrides", content)
         self.header.setObjectName("DialogLabel")
-        content_layout.addWidget(self.header)
+        header_row.addWidget(self.header, 1)
+
+        self.btn_save_all = QPushButton("Save All", content)
+        self.btn_save_all.setEnabled(False)
+        self.btn_save_all.clicked.connect(self.save_all_changes)
+        header_row.addWidget(self.btn_save_all)
+        content_layout.addLayout(header_row)
+
+        self.dependency_hint = QLabel("", content)
+        self.dependency_hint.setObjectName("DialogLabel")
+        self.dependency_hint.setWordWrap(True)
+        self.dependency_hint.setVisible(False)
+        content_layout.addWidget(self.dependency_hint)
 
         self.tabs = QTabWidget(content)
         self.tabs.setObjectName("MainTabs")
+        self._tab_base_titles: Dict[_EditorTabBase, str] = {}
 
         self.tab_canon = CanonMappingsTab(self._db, self._icon_dir, self)
         self.tab_models = ModelsTab(self._db, self._icon_dir, self)
@@ -1196,6 +1210,7 @@ class CatalogEditorWindow(QMainWindow):
             per_color_idx,
             "Counts listed PM Units once per color channel (K/C/M/Y) instead of once per matching canon item.",
         )
+        self._register_dirty_tab_markers()
         self.tabs.currentChanged.connect(self._on_tab_changed)
         content_layout.addWidget(self.tabs, 1)
 
@@ -1211,6 +1226,74 @@ class CatalogEditorWindow(QMainWindow):
 
     def _confirm_close(self):
         self.close()
+
+    def _editor_tabs(self) -> List[_EditorTabBase]:
+        return [
+            self.tab_models,
+            self.tab_units,
+            self.tab_canon,
+            self.tab_per_color,
+            self.tab_qty,
+        ]
+
+    def _save_all_order(self) -> List[_EditorTabBase]:
+        return [
+            self.tab_canon,
+            self.tab_units,
+            self.tab_models,
+            self.tab_per_color,
+            self.tab_qty,
+        ]
+
+    def _register_dirty_tab_markers(self):
+        for tab in self._editor_tabs():
+            index = self.tabs.indexOf(tab)
+            if index < 0:
+                continue
+            self._tab_base_titles[tab] = self.tabs.tabText(index)
+            tab.dirty_changed.connect(lambda _dirty, tab=tab: self._update_tab_dirty_marker(tab))
+            self._update_tab_dirty_marker(tab)
+        self._update_save_all_enabled()
+        self._update_dependency_hint()
+
+    def _update_tab_dirty_marker(self, tab: _EditorTabBase):
+        index = self.tabs.indexOf(tab)
+        if index < 0:
+            return
+        base_title = self._tab_base_titles.get(tab, self.tabs.tabText(index).rstrip(" *"))
+        self.tabs.setTabText(index, f"{base_title} *" if tab.is_dirty else base_title)
+        self._update_save_all_enabled()
+        self._update_dependency_hint()
+
+    def _update_save_all_enabled(self):
+        self.btn_save_all.setEnabled(self._any_dirty())
+
+    def _update_dependency_hint(self):
+        has_unsaved_changes = self._any_dirty()
+        self.dependency_hint.setText(
+            "Save changes to make updated catalog data available across all Catalog Editor tabs."
+            if has_unsaved_changes
+            else ""
+        )
+        self.dependency_hint.setVisible(has_unsaved_changes)
+
+    def save_all_changes(self):
+        for tab in self._save_all_order():
+            if not tab.is_dirty:
+                continue
+
+            tab.save_changes()
+
+            if tab.is_dirty:
+                index = self.tabs.indexOf(tab)
+                if index >= 0:
+                    self.tabs.setCurrentIndex(index)
+                self._update_save_all_enabled()
+                self._update_dependency_hint()
+                return
+
+        self._update_save_all_enabled()
+        self._update_dependency_hint()
 
     def _on_tab_changed(self, index: int):
         if self.tabs.widget(index) is self.tab_models:

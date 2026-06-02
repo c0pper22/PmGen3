@@ -9,6 +9,85 @@ def test_catalog_editor_is_frameless(qtbot):
     qtbot.addWidget(window)
 
     assert bool(window.windowFlags() & Qt.WindowType.FramelessWindowHint)
+
+
+def test_catalog_editor_marks_dirty_tabs_and_save_all_state(qtbot):
+    window = CatalogEditorWindow(icon_dir="", parent=None)
+    qtbot.addWidget(window)
+
+    tab_index = window.tabs.indexOf(window.tab_units)
+
+    assert window.tabs.tabText(tab_index) == "PM Units"
+    assert not window.btn_save_all.isEnabled()
+
+    window.tab_units._set_dirty(True)
+
+    assert window.tabs.tabText(tab_index) == "PM Units *"
+    assert window.btn_save_all.isEnabled()
+
+    window.tab_units._set_dirty(False)
+
+    assert window.tabs.tabText(tab_index) == "PM Units"
+    assert not window.btn_save_all.isEnabled()
+
+
+def test_catalog_editor_save_all_saves_dirty_tabs_in_dependency_order(qtbot, monkeypatch):
+    window = CatalogEditorWindow(icon_dir="", parent=None)
+    qtbot.addWidget(window)
+    calls = []
+
+    def fake_save(tab, name):
+        calls.append(name)
+        tab._set_dirty(False)
+
+    monkeypatch.setattr(window.tab_units, "save_changes", lambda: fake_save(window.tab_units, "units"))
+    monkeypatch.setattr(window.tab_models, "save_changes", lambda: fake_save(window.tab_models, "models"))
+    monkeypatch.setattr(window.tab_qty, "save_changes", lambda: fake_save(window.tab_qty, "qty"))
+
+    window.tab_models._set_dirty(True)
+    window.tab_units._set_dirty(True)
+    window.tab_qty._set_dirty(True)
+
+    window.save_all_changes()
+
+    assert calls == ["units", "models", "qty"]
+    assert not window.btn_save_all.isEnabled()
+
+
+def test_catalog_editor_shows_general_dependency_hint_for_any_dirty_tab(qtbot):
+    window = CatalogEditorWindow(icon_dir="", parent=None)
+    qtbot.addWidget(window)
+
+    assert window.dependency_hint.isHidden()
+
+    window.tab_models._set_dirty(True)
+
+    assert not window.dependency_hint.isHidden()
+    assert window.dependency_hint.text() == (
+        "Save changes to make updated catalog data available across all Catalog Editor tabs."
+    )
+
+    window.tab_models._set_dirty(False)
+
+    assert window.dependency_hint.isHidden()
+
+
+def test_catalog_editor_dependency_hint_stays_visible_when_switching_tabs(qtbot):
+    window = CatalogEditorWindow(icon_dir="", parent=None)
+    qtbot.addWidget(window)
+
+    window.tab_qty._set_dirty(True)
+
+    for index in range(window.tabs.count()):
+        window.tabs.setCurrentIndex(index)
+        assert not window.dependency_hint.isHidden()
+        assert window.dependency_hint.text() == (
+            "Save changes to make updated catalog data available across all Catalog Editor tabs."
+        )
+
+    window.tab_qty._set_dirty(False)
+
+
 class _FakeMappingsDB:
     def __init__(self, mappings):
         self._mappings = mappings
