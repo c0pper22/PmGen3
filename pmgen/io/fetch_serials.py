@@ -12,6 +12,7 @@ except Exception:
 BASE_URL = "https://eservice.toshiba-solutions.com"
 LOGIN_PAGE = f"{BASE_URL}/Account/LogOn"
 DEVICE_INDEX = f"{BASE_URL}/Device/Index"
+DEVICE_INDEX_INACTIVE = f"{BASE_URL}/Device?tabIndex=1"
 
 HEADERS_COMMON = {
     "User-Agent": (
@@ -147,6 +148,11 @@ def parse_description_map(html: str) -> Dict[str, str]:
 # ─────────────────────────────────────────────────────────────
 # Public API used by http_client.SessionPool callers
 # ─────────────────────────────────────────────────────────────
+def _fetch_device_index_html(session: requests.Session, url: str) -> str:
+    r = session.get(url, headers=HEADERS_COMMON, timeout=30, allow_redirects=True)
+    r.raise_for_status()
+    return r.text
+
 def get_active_serials(session: requests.Session) -> List[str]:
     """
     Fetch the Toshiba eService device index using a **logged-in** session and
@@ -157,8 +163,16 @@ def get_active_serials(session: requests.Session) -> List[str]:
         GET https://eservice.toshiba-solutions.com/Device/Index
         with the same HEADERS_COMMON.
     """
-    r = session.get(DEVICE_INDEX, headers=HEADERS_COMMON, timeout=30)
-    r.raise_for_status()
-    html = r.text
-    # Parse serials from the HTML
-    return parse_serial_numbers(html)
+    return parse_serial_numbers(_fetch_device_index_html(session, DEVICE_INDEX))
+
+def get_inactive_serials(session: requests.Session) -> List[str]:
+    """
+    Fetch the Toshiba eService device index using a **logged-in** session and
+    return all inactive device serials found on that page.
+
+    - Assumes `session` is already authenticated (login handled elsewhere).
+    - Mirrors the exact request old_http_client.py used:
+        GET https://eservice.toshiba-solutions.com/Device?tabIndex=1
+        with the same HEADERS_COMMON.
+    """
+    return parse_serial_numbers(_fetch_device_index_html(session, DEVICE_INDEX_INACTIVE))

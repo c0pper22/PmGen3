@@ -67,8 +67,8 @@ def mock_main_window(qtbot, monkeypatch):
 def test_proxy_model_filtering():
     """Test that the search filter correctly matches Serial, Model, or Customer."""
     source = BulkQueueModel()
-    source.add_item(serial="SN123", model="PrinterX", customer="CorpA")
-    source.add_item(serial="SN999", model="ScannerY", customer="CorpB")
+    source.add_item(serial="SN123", model="PrinterX", customer="CorpA", machine_status="Active")
+    source.add_item(serial="SN999", model="ScannerY", customer="CorpB", machine_status="Inactive")
     
     proxy = BulkSortFilterProxyModel()
     proxy.setSourceModel(source)
@@ -80,6 +80,10 @@ def test_proxy_model_filtering():
     proxy.setFilterRegularExpression(QRegularExpression("corpb"))
     assert proxy.rowCount() == 1
     assert proxy.data(proxy.index(0, 3)) == "CorpB"
+
+    proxy.setFilterRegularExpression(QRegularExpression("inactive"))
+    assert proxy.rowCount() == 1
+    assert proxy.data(proxy.index(0, 4)) == "Inactive"
 
 class MockBulkModel(QStandardItemModel):
     """A clean item model to bypass BulkQueueModel's complex internal logic for testing."""
@@ -147,7 +151,8 @@ def test_mainwindow_bulk_config_save_load(mock_main_window):
         pool_size=8, 
         blacklist=["BAD_SN"], 
         custom_08_name="TestCol", 
-        custom_08_code=123
+        custom_08_code=123,
+        machine_filter="inactive"
     )
     
     window._save_bulk_config(cfg)
@@ -159,6 +164,16 @@ def test_mainwindow_bulk_config_save_load(mock_main_window):
     assert "BAD_SN" in loaded_cfg.blacklist
     assert loaded_cfg.custom_08_name == "TestCol"
     assert loaded_cfg.custom_08_code == 123
+    assert loaded_cfg.machine_filter == "inactive"
+
+
+def test_mainwindow_bulk_config_defaults_machine_filter_to_both(mock_main_window):
+    """Bulk machine filter should default to both for existing users."""
+    window = mock_main_window
+
+    loaded_cfg = window._get_bulk_config()
+
+    assert loaded_cfg.machine_filter == "both"
 
 def test_mainwindow_tab_close_protection(mock_main_window, monkeypatch):
     """Test that the Home and Inventory tabs cannot be closed."""

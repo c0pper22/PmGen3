@@ -60,15 +60,19 @@ class BulkConfig:
     custom_08_name: str = ""
     custom_08_code: int = 0
     generate_pdfs: bool = True
+    machine_filter: str = "both"
 
     def __post_init__(self):
         if self.blacklist is None: self.blacklist = []
+        self.machine_filter = (self.machine_filter or "both").strip().lower()
+        if self.machine_filter not in {"active", "inactive", "both"}:
+            self.machine_filter = "both"
 
 class BulkRunner(QObject):
     progress = pyqtSignal(str)
     progress_value = pyqtSignal(int, int)
     finished = pyqtSignal(str)
-    item_updated = pyqtSignal(str, str, str, str, str, str)
+    item_updated = pyqtSignal(str, str, str, str, str, str, str)
 
     def __init__(self, cfg: BulkConfig, threshold: float, life_basis: str,
                  threshold_enabled: bool = True,
@@ -103,6 +107,19 @@ class BulkRunner(QObject):
         if p is None: return "—"
         try: return f"{(float(p) * 100):.1f}%"
         except Exception: return "—"
+
+    def _machine_filter_label(self) -> str:
+        labels = {"active": "Active", "inactive": "Inactive", "both": "Active/Inactive"}
+        return labels.get(self.cfg.machine_filter, "Active/Inactive")
+
+    def _filter_serials_by_machine_state(self, serial_status_map: Dict[str, str]) -> list[str]:
+        if self.cfg.machine_filter == "both":
+            return list(serial_status_map.keys())
+
+        return [
+            serial for serial, machine_status in serial_status_map.items()
+            if str(machine_status).strip().lower() == self.cfg.machine_filter
+        ]
 
     def _check_date_filter(self, d: date) -> str | None:
         """
@@ -152,7 +169,7 @@ class BulkRunner(QObject):
                     counter += 1
                 os.makedirs(final_out_dir, exist_ok=True)
 
-            from pmgen.io.http_client import SessionPool, get_serials_after_login, get_service_file_bytes, get_unpacking_date
+            from pmgen.io.http_client import SessionPool, get_serial_status_map_after_login, get_service_file_bytes, get_unpacking_date
             from pmgen.parsing.parse_pm_report import parse_pm_report
             from pmgen.engine.run_rules import run_rules
             from pmgen.engine.single_report import create_pdf_report
@@ -170,16 +187,18 @@ class BulkRunner(QObject):
 
             # 2. Get Serials
             with pool.acquire() as sess:
-                serials = get_serials_after_login(sess)
+                serial_status_map = get_serial_status_map_after_login(sess)
+                serials = self._filter_serials_by_machine_state(serial_status_map)
 
-            self.progress.emit(f"[Info] Found {len(serials)} Active Serials.")
+            self.progress.emit(f"[Info] Found {len(serials)} {self._machine_filter_label()} Serials.")
 
             # 3. Filter Blacklist Only (Date filtering happens during processing now)
             serials0 = list(serials or [])
             serials_to_process = [s for s in serials0 if not self._is_blacklisted(s)]
 
             for s in serials_to_process:
-                self.item_updated.emit(s, "Queued", "", "Unknown", "", "")
+                machine_status = serial_status_map.get(s, "")
+                self.item_updated.emit(s, "Queued", "", "Unknown", "", "", machine_status)
 
             if QThread.currentThread().isInterruptionRequested():
                 self.finished.emit("[Info] Stopped.")
@@ -200,7 +219,8 @@ class BulkRunner(QObject):
 
             # --- WORKER FUNCTION ---
             def work(serial: str):
-                self.item_updated.emit(serial, "Processing", "...", "", "", "")
+                machine_status = serial_status_map.get(serial, "")
+                self.item_updated.emit(serial, "Processing", "...", "", "", "", machine_status)
                 
                 cust_name = self.customer_map.get(serial, "")
 
@@ -240,7 +260,7 @@ class BulkRunner(QObject):
                     if filter_reason:
                         # FILTERED: Update UI with percentage, but mark as filtered.
                         # We do NOT generate the individual PDF report.
-                        self.item_updated.emit(serial, "Filtered", pct_str, model_name, d_str, custom08_val)
+                        self.item_updated.emit(serial, "Filtered", pct_str, model_name, d_str, custom08_val, machine_status)
                         
                         return {
                             "serial": serial,
@@ -257,7 +277,7 @@ class BulkRunner(QObject):
                                 customer_name=cust_name
                             )
 
-                        self.item_updated.emit(serial, "Done", pct_str, model_name, d_str, custom08_val)
+                        self.item_updated.emit(serial, "Done", pct_str, model_name, d_str, custom08_val, machine_status)
 
                         return {
                             "serial": (report.headers or {}).get("serial") or serial,
@@ -274,7 +294,7 @@ class BulkRunner(QObject):
                         }
 
                 except Exception as e:
-                    self.item_updated.emit(serial, "Failed", str(e), "", "", "")
+                    self.item_updated.emit(serial, "Failed", str(e), "", "", "", machine_status)
                     return {"serial": serial, "error": str(e), "trace": traceback.format_exc()}
 
             # --- EXECUTION LOOP ---

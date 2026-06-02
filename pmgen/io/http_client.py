@@ -29,6 +29,7 @@ LOGIN_PAGE = f"{BASE_URL}/Account/LogOn"
 LOGIN_POST = f"{BASE_URL}/Account/LogOn"
 SERVICE_FILES = f"{BASE_URL}/Device/GetServiceFiles"
 DEVICE_INDEX = f"{BASE_URL}/Device/Index"
+DEVICE_INDEX_INACTIVE = f"{BASE_URL}/Device?tabIndex=1"
 LOGOUT_URL = f"{BASE_URL}/Account/LogOff"
 
 HEADERS_COMMON = {
@@ -294,24 +295,41 @@ def get_service_file_bytes(serial: str, option: str = "PMSupport",
             except Exception:
                 pass
 
+def _fetch_device_index_html(sess: requests.Session, url: str) -> str:
+    r = sess.get(url, headers=HEADERS_COMMON, timeout=30, allow_redirects=True)
+    r.raise_for_status()
+    return r.text
+
+def _device_index_pages(sess: requests.Session) -> List[str]:
+    return [
+        _fetch_device_index_html(sess, DEVICE_INDEX),
+        _fetch_device_index_html(sess, DEVICE_INDEX_INACTIVE),
+    ]
+
+def get_serial_status_map_after_login(sess: requests.Session) -> Dict[str, str]:
+    """
+    Return a {serial: machine_status} map for active and inactive device tabs.
+    Active wins if the same serial appears on both tabs.
+    """
+    serial_status_map: Dict[str, str] = {}
+    for machine_status, url in (("Active", DEVICE_INDEX), ("Inactive", DEVICE_INDEX_INACTIVE)):
+        html = _fetch_device_index_html(sess, url)
+        for serial in parse_serial_numbers(html):
+            serial_status_map.setdefault(serial, machine_status)
+    return serial_status_map
+
 def get_serials_after_login(sess: requests.Session) -> List[str]:
     """
-    Navigate to Device Index and parse active serials.
+    Navigate to active and inactive Device Index pages and parse serials.
     Requires a logged-in session.
     """
-    r = sess.get(DEVICE_INDEX, headers=HEADERS_COMMON, timeout=30, allow_redirects=True)
-    r.raise_for_status()
-    html = r.text
-    serials: List[str] = []
-    serials = parse_serial_numbers(html)
-    return serials
+    return list(get_serial_status_map_after_login(sess).keys())
 
 def get_customer_map_after_login(sess: requests.Session) -> Dict[str, str]:
-    r = sess.get(DEVICE_INDEX, headers=HEADERS_COMMON, timeout=30, allow_redirects=True)
-    r.raise_for_status()
-    html = r.text
     customer_map: Dict[str, str] = {}
-    customer_map = parse_customer_map(html)
+    for html in _device_index_pages(sess):
+        for serial, customer_name in parse_customer_map(html).items():
+            customer_map.setdefault(serial, customer_name)
     return customer_map
 
 def _parse_unpacking_date_from_08_bytes(blob: bytes) -> Optional[date]:

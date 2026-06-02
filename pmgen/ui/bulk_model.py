@@ -7,25 +7,25 @@ class BulkQueueModel(QAbstractTableModel):
         self.has_custom = bool(custom_col_name)
         
         # Build headers dynamically
-        self.headers = ["#", "Serial", "Model", "Customer", "Unpack Date"]
+        self.headers = ["#", "Serial", "Model", "Customer", "Machine State", "Unpack Date"]
         if self.has_custom:
             self.headers.append(custom_col_name)
         self.headers.extend(["Status", "Result"])
         
         # Internal Data Structure is strictly: 
-        # [Serial(0), Model(1), Customer(2), UnpackDate(3), Custom08(4), Status(5), Result(6)]
+        # [Serial(0), Model(1), Customer(2), MachineState(3), UnpackDate(4), Custom08(5), Status(6), Result(7)]
         self._data = []
 
-        self.visual_to_internal = { 1: 0, 2: 1, 3: 2, 4: 3 }
+        self.visual_to_internal = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 }
         
         if self.has_custom:
-            self.visual_to_internal.update({ 5: 4, 6: 5, 7: 6 })
+            self.visual_to_internal.update({ 6: 5, 7: 6, 8: 7 })
+            self.status_col = 7
+            self.result_col = 8
+        else:
+            self.visual_to_internal.update({ 6: 6, 7: 7 })
             self.status_col = 6
             self.result_col = 7
-        else:
-            self.visual_to_internal.update({ 5: 5, 6: 6 })
-            self.status_col = 5
-            self.result_col = 6
 
     def rowCount(self, parent=None):
         return len(self._data)
@@ -48,7 +48,7 @@ class BulkQueueModel(QAbstractTableModel):
                 return self._data[row][self.visual_to_internal[col]]
         
         if role == Qt.ItemDataRole.ForegroundRole and col == self.status_col:
-            status = self._data[row][5] # Status is always internal index 5
+            status = self._data[row][6]
             if status == "Done": return QBrush(QColor("#40ed68"))       # Green
             if status == "Failed": return QBrush(QColor("#f7768e"))     # Pink/Red
             if status == "Processing": return QBrush(QColor("#7aa2f7")) # Blue
@@ -89,10 +89,10 @@ class BulkQueueModel(QAbstractTableModel):
         def sort_key(row_data):
             val = row_data[internal_idx]
             
-            if internal_idx == 5: # Status
+            if internal_idx == 6: # Status
                 return status_priority(val)
             
-            if internal_idx == 6: # Result
+            if internal_idx == 7: # Result
                 s_val = str(val)
                 if "%" in s_val:
                     return (0, percentage_value(s_val))
@@ -103,22 +103,22 @@ class BulkQueueModel(QAbstractTableModel):
         self._data.sort(key=sort_key, reverse=reverse)
         self.layoutChanged.emit()
 
-    def add_item(self, serial, model="Unknown", customer=""):
+    def add_item(self, serial, model="Unknown", customer="", machine_status=""):
         self.beginInsertRows(QModelIndex(), len(self._data), len(self._data))
-        # Add 7 elements: [Serial, Model, Customer, Unpack, Custom08, Status, Result]
-        self._data.append([serial, model, customer, "", "", "Queued", ""])
+        self._data.append([serial, model, customer, machine_status, "", "", "Queued", ""])
         self.endInsertRows()
 
-    def update_status(self, serial, status, result, model=None, unpack_date=None, customer=None, custom08_val=None):
+    def update_status(self, serial, status, result, model=None, unpack_date=None, customer=None, custom08_val=None, machine_status=None):
         for i, row in enumerate(self._data):
             if row[0] == serial:
-                row[5] = status
-                row[6] = result
+                row[6] = status
+                row[7] = result
                 
                 if model and model != "Unknown": row[1] = model
                 if customer: row[2] = customer
-                if unpack_date: row[3] = unpack_date
-                if custom08_val is not None: row[4] = custom08_val
+                if machine_status: row[3] = machine_status
+                if unpack_date: row[4] = unpack_date
+                if custom08_val is not None: row[5] = custom08_val
 
                 self.dataChanged.emit(self.index(i, 1), self.index(i, self.columnCount() - 1))
                 return

@@ -53,3 +53,24 @@ def test_date_filter_passes(base_config):
     
     result = runner._check_date_filter(date.today())
     assert result is None 
+
+
+def test_bulk_config_defaults_machine_filter_to_both():
+    cfg = BulkConfig()
+
+    assert cfg.machine_filter == "both"
+
+
+def test_bulk_runner_filters_machine_state(base_config):
+    runner = BulkRunner(
+        cfg=BulkConfig(machine_filter="inactive"),
+        threshold=0.8,
+        life_basis="page",
+    )
+
+    serials = runner._filter_serials_by_machine_state({
+        "ACTV12345": "Active",
+        "INAC67890": "Inactive",
+    })
+
+    assert serials == ["INAC67890"]

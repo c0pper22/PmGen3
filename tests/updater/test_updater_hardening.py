@@ -1,3 +1,4 @@
+import hashlib
 import zipfile
 from pathlib import Path
 
@@ -38,6 +39,58 @@ def test_safe_extract_zip_rejects_path_traversal(tmp_path):
             assert False, "Expected ValueError for unsafe zip member path"
         except ValueError as exc:
             assert "Unsafe path" in str(exc)
+
+
+def test_download_update_emits_zip_path_after_checksum_validation(tmp_path, monkeypatch):
+    payload = b"fake zip bytes"
+    expected_checksum = hashlib.sha256(payload).hexdigest()
+    session_dir = tmp_path / "session"
+
+    class FakeResponse:
+        def __init__(self, body: bytes = b"", text: str = ""):
+            self.body = body
+            self.text = text
+            self.headers = {"content-length": str(len(body))}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def raise_for_status(self):
+            return None
+
+        def iter_content(self, chunk_size=8192):
+            yield self.body
+
+    def fake_get(url, **_kwargs):
+        if url.endswith(updater.CHECKSUM_SUFFIX):
+            return FakeResponse(text=f"{expected_checksum}  {updater.ASSET_NAME}")
+        return FakeResponse(body=payload)
+
+    def fake_session_dir():
+        session_dir.mkdir(parents=True, exist_ok=True)
+        return session_dir
+
+    monkeypatch.setattr(updater, "_new_update_session_dir", fake_session_dir)
+    monkeypatch.setattr(updater.requests, "get", fake_get)
+
+    worker = updater.UpdateWorker()
+    finished = []
+    errors = []
+    progress = []
+    worker.download_finished.connect(finished.append)
+    worker.error_occurred.connect(errors.append)
+    worker.download_progress.connect(progress.append)
+
+    worker.download_update("https://example.test/PmGen.zip")
+
+    zip_path = session_dir / updater.ASSET_NAME
+    assert finished == [str(zip_path)]
+    assert errors == []
+    assert progress == [100]
+    assert zip_path.read_bytes() == payload
 
 
 def test_resolve_payload_root_finds_nested_target(tmp_path):

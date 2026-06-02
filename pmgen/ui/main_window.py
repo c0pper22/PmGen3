@@ -49,6 +49,7 @@ BULK_TOPN_KEY = "bulk/top_n"
 BULK_DIR_KEY  = "bulk/out_dir"
 BULK_POOL_KEY = "bulk/pool_size"
 BULK_BLACKLIST_KEY = "bulk/blacklist"
+BULK_MACHINE_FILTER_KEY = "bulk/machine_filter"
 
 # =============================================================================
 #  NEW CLASS: BulkSortFilterProxyModel
@@ -62,8 +63,8 @@ class BulkSortFilterProxyModel(QSortFilterProxyModel):
 
     def filterAcceptsRow(self, source_row, source_parent):
         """
-        Filters rows based on the search text. 
-        Checks Serial (Col 1), Model (Col 2), and Customer (Col 3).
+        Filters rows based on the search text.
+        Checks Serial, Model, Customer, and Machine State.
         """
         pattern = self.filterRegularExpression().pattern()
         if not pattern:
@@ -76,13 +77,14 @@ class BulkSortFilterProxyModel(QSortFilterProxyModel):
             idx = model.index(source_row, col_idx, source_parent)
             return str(model.data(idx) or "").lower()
 
-        # Visual Mapping: 1=Serial, 2=Model, 3=Customer
+        # Visual Mapping: 1=Serial, 2=Model, 3=Customer, 4=Machine State
         serial = get_col_str(1)
         model_name = get_col_str(2)
         customer = get_col_str(3)
+        machine_status = get_col_str(4)
         
         p = pattern.lower()
-        return (p in serial) or (p in model_name) or (p in customer)
+        return (p in serial) or (p in model_name) or (p in customer) or (p in machine_status)
 
     def lessThan(self, left: QModelIndex, right: QModelIndex):
         left_data = self.sourceModel().data(left)
@@ -185,6 +187,7 @@ class BulkRunTab(QWidget):
             f"  - top_n: {cfg.top_n}",
             f"  - pool_size: {cfg.pool_size}",
             f"  - generate_pdfs: {cfg.generate_pdfs}",
+            f"  - machine_filter: {cfg.machine_filter}",
             f"  - out_dir: {cfg.out_dir or '(not set)'}",
             f"  - show_all: {cfg.show_all}",
             f"  - threshold_enabled: {threshold_enabled}",
@@ -221,7 +224,7 @@ class BulkRunTab(QWidget):
         # Search Bar
         self.search_bar = QLineEdit()
         self.search_bar.setObjectName("BulkSearch")
-        self.search_bar.setPlaceholderText("Search serial, model...")
+        self.search_bar.setPlaceholderText("Search serial, model, customer, state...")
         self.search_bar.setClearButtonEnabled(True)
         self.search_bar.setFixedWidth(200)
         self.search_bar.textChanged.connect(self._on_search_changed)
@@ -266,6 +269,7 @@ class BulkRunTab(QWidget):
         self.view.setSortingEnabled(True)
         self.view.setColumnWidth(2, 160)
         self.view.setColumnWidth(3, 300)
+        self.view.setColumnWidth(4, 120)
         header = self.view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -424,19 +428,19 @@ class BulkRunTab(QWidget):
         self.progress_bar.setMaximum(total)
         self.progress_bar.setValue(current)
 
-    @pyqtSlot(str, str, str, str, str, str)
-    def _on_item_updated(self, serial, status, result, model, unpack_date, custom08_val):
+    @pyqtSlot(str, str, str, str, str, str, str)
+    def _on_item_updated(self, serial, status, result, model, unpack_date, custom08_val, machine_status):
         c_name = self.customer_map.get(serial, "")
         found = False
         for r in range(self.model.rowCount()):
             if self.model.get_serial_at(r) == serial:
-                self.model.update_status(serial, status, result, model, unpack_date, customer=c_name, custom08_val=custom08_val)
+                self.model.update_status(serial, status, result, model, unpack_date, customer=c_name, custom08_val=custom08_val, machine_status=machine_status)
                 found = True
                 break
         
         if not found:
-            self.model.add_item(serial, model, customer=c_name)
-            self.model.update_status(serial, status, result, model, unpack_date, customer=c_name, custom08_val=custom08_val)
+            self.model.add_item(serial, model, customer=c_name, machine_status=machine_status)
+            self.model.update_status(serial, status, result, model, unpack_date, customer=c_name, custom08_val=custom08_val, machine_status=machine_status)
             
     @pyqtSlot(str)
     def _on_finished(self, msg):
@@ -492,7 +496,7 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(icon_path))
 
         self.setWindowTitle("PmGen")
-        self.resize(1100, 720)
+        self.resize(1200, 720)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
 
         if getattr(sys, 'frozen', False):
@@ -655,6 +659,7 @@ class MainWindow(QMainWindow):
         except: c_code = 0
         
         gen_pdfs = bool(s.value("bulk/generate_pdfs", True, bool))
+        machine_filter = s.value(BULK_MACHINE_FILTER_KEY, "both", str)
 
         return BulkConfig(
             top_n=max(1, min(9999, top_n)), 
@@ -663,7 +668,8 @@ class MainWindow(QMainWindow):
             blacklist=bl, 
             custom_08_name=c_name, 
             custom_08_code=c_code,
-            generate_pdfs=gen_pdfs
+            generate_pdfs=gen_pdfs,
+            machine_filter=machine_filter
         )
 
     def _save_bulk_config(self, cfg: BulkConfig):
@@ -675,6 +681,7 @@ class MainWindow(QMainWindow):
         s.setValue("bulk/custom_08_name", cfg.custom_08_name)
         s.setValue("bulk/custom_08_code", cfg.custom_08_code)
         s.setValue("bulk/generate_pdfs", bool(cfg.generate_pdfs))
+        s.setValue(BULK_MACHINE_FILTER_KEY, cfg.machine_filter)
 
     def _get_show_all(self) -> bool:
         return bool(QSettings().value(self.SHOW_ALL_KEY, False, bool))
@@ -1148,6 +1155,16 @@ class MainWindow(QMainWindow):
         # --- Standard Config ---
         sp_top = QSpinBox(dlg); sp_top.setObjectName("DialogInput"); sp_top.setRange(1, 9999); sp_top.setValue(cfg.top_n)
         sp_pool = QSpinBox(dlg); sp_pool.setObjectName("DialogInput"); sp_pool.setRange(1, 16); sp_pool.setValue(cfg.pool_size)
+        machine_box = QComboBox(dlg); machine_box.setObjectName("DialogInput")
+        for label, value in (("Both", "both"), ("Active", "active"), ("Inactive", "inactive")):
+            machine_box.addItem(label, value)
+        machine_box.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        machine_box.setMinimumContentsLength(len("Inactive"))
+        machine_box.setMinimumWidth(machine_box.fontMetrics().horizontalAdvance("Inactive") + 48)
+        machine_box.view().setMinimumWidth(machine_box.minimumWidth())
+        machine_box.view().setTextElideMode(Qt.TextElideMode.ElideNone)
+        machine_idx = machine_box.findData(cfg.machine_filter)
+        machine_box.setCurrentIndex(machine_idx if machine_idx >= 0 else 0)
         cb_gen_pdfs = QCheckBox("Generate PDF Reports", dlg)
         cb_gen_pdfs.setObjectName("DialogCheckbox")
         cb_gen_pdfs.setChecked(cfg.generate_pdfs)
@@ -1191,7 +1208,8 @@ class MainWindow(QMainWindow):
                 top_n=sp_top.value(), out_dir=ed_dir.text().strip(), 
                 pool_size=sp_pool.value(), blacklist=bl,
                 custom_08_name=cb_cust_name.text().strip(), custom_08_code=sp_cust_code.value(),
-                generate_pdfs=cb_gen_pdfs.isChecked()
+                generate_pdfs=cb_gen_pdfs.isChecked(),
+                machine_filter=machine_box.currentData() or "both"
             ))
             
             
@@ -1210,6 +1228,7 @@ class MainWindow(QMainWindow):
         l = dlg._content_layout
         l.addLayout(_row("Top N serials:", sp_top))
         l.addLayout(_row("Parallel workers:", sp_pool))
+        l.addLayout(_row("Active/Inactive filter:", machine_box))
         
         l.addWidget(cb_gen_pdfs)
 

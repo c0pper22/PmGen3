@@ -6,13 +6,15 @@ def test_add_item(qtbot):
     """Test that adding an item correctly populates the internal data structure."""
     model = BulkQueueModel()
     
-    model.add_item(serial="SN123", model="PrinterX", customer="CorpA")
+    model.add_item(serial="SN123", model="PrinterX", customer="CorpA", machine_status="Inactive")
     
     assert model.rowCount() == 1
+    assert model.headerData(4, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole) == "Machine State"
     
     assert model._data[0][0] == "SN123"
     assert model._data[0][1] == "PrinterX"
-    assert model._data[0][5] == "Queued"
+    assert model._data[0][3] == "Inactive"
+    assert model._data[0][6] == "Queued"
 
 def test_update_status(qtbot):
     """Test that updating an item modifies the correct indices."""
@@ -24,10 +26,12 @@ def test_update_status(qtbot):
         status="Done", 
         result="95.0%", 
         model="PrinterY",
-        customer="CorpB"
+        customer="CorpB",
+        machine_status="Active"
     )
     
-    assert model._data[0][5] == "Done"
-    assert model._data[0][6] == "95.0%"
+    assert model._data[0][6] == "Done"
+    assert model._data[0][7] == "95.0%"
     assert model._data[0][1] == "PrinterY" 
     assert model._data[0][2] == "CorpB"
+    assert model._data[0][3] == "Active"
