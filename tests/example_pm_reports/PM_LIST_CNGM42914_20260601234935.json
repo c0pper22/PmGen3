@@ -1,0 +1,16 @@
+{
+    "config": {
+        "threshold": 0.90,
+        "life_basis": "page",
+        "threshold_enabled": true
+    },
+    "expected_parts": {
+        "6LK49015000": 1,
+        "6LK49168000": 1,
+        "6LJ70598000": 3,
+        "6LK49167000": 1,
+        "6LJ70575000": 1,
+        "6LJ58192000": 1,
+        "6LK50755000": 2
+    }
+}
