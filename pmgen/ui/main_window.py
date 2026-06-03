@@ -159,15 +159,24 @@ class BulkRunTab(QWidget):
     def __init__(self, config: BulkConfig, runner_kwargs: dict, parent=None):
         super().__init__(parent)
         self.config = config
-        self.runner_kwargs = runner_kwargs
+        self.runner_kwargs = dict(runner_kwargs)
 
-        self.customer_map = runner_kwargs.get("customer_map", {})
+        self.customer_map = self._normalize_customer_map(self.runner_kwargs.get("customer_map", {}))
+        self.runner_kwargs["customer_map"] = self.customer_map
         
         self._thread: QThread | None = None
         self._runner: BulkRunner | None = None
         self._is_running = False
 
         self._setup_ui()
+
+    @staticmethod
+    def _normalize_customer_map(customer_map: Dict[str, str]) -> Dict[str, str]:
+        return {
+            str(serial).strip().upper(): customer_name
+            for serial, customer_name in (customer_map or {}).items()
+            if str(serial).strip()
+        }
 
     def _log_run_settings(self):
         cfg = self.config
@@ -430,7 +439,7 @@ class BulkRunTab(QWidget):
 
     @pyqtSlot(str, str, str, str, str, str, str)
     def _on_item_updated(self, serial, status, result, model, unpack_date, custom08_val, machine_status):
-        c_name = self.customer_map.get(serial, "")
+        c_name = self.customer_map.get(str(serial).strip().upper(), "")
         found = False
         for r in range(self.model.rowCount()):
             if self.model.get_serial_at(r) == serial:

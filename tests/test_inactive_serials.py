@@ -28,6 +28,33 @@ def _device_row(serial: str, customer: str) -> str:
     )
 
 
+def _generic_device_table(serial: str, customer: str) -> str:
+    return (
+        "<table>"
+        "<tr><th>Serial Number</th><th>Customer Name</th></tr>"
+        f"<tr><td>{serial}</td><td>{customer}</td></tr>"
+        "</table>"
+    )
+
+
+def _inactive_unassigned_device_row(serial: str) -> str:
+    return (
+        "<table><tr>"
+        "<td style='display:none;' id='Device_1693467'>1</td>"
+        "<td style='white-space:nowrap'>"
+        f"<a id='inactive_1693467' onclick='getDeviceInfo(1693467); return false;'> {serial} </a>"
+        "</td>"
+        "<td class='break-word deviceMachineID'>IN5913DTP</td>"
+        "<td class='deviceModels break-word'>ESTUDIO6527ACT</td>"
+        "<td class='break-word'>"
+        "<span style='font-style:italic; color:Gray' class='noCustomerName'>(No Customer Assigned)</span>"
+        "<a href='#' class='deviceCustomers' onclick=\"getCustomerInfoView('1693467'); return false;\">Edit</a>"
+        "</td>"
+        "<td class='status'>Deactivated</td>"
+        "</tr></table>"
+    )
+
+
 def test_get_inactive_serials_fetches_inactive_page_and_parses_serials():
     session = FakeSession({
         fetch_serials.DEVICE_INDEX_INACTIVE: '<div data-serial="INAC67890"></div>'
@@ -105,3 +132,25 @@ def test_get_customer_map_after_login_includes_inactive_customers():
         "DUPL11111": "Active Duplicate",
         "INAC67890": "Inactive Customer",
     }
+
+
+def test_get_customer_map_after_login_parses_inactive_customer_header_table():
+    session = FakeSession({
+        http_client.DEVICE_INDEX: "<table></table>",
+        http_client.DEVICE_INDEX_INACTIVE: _generic_device_table("inac67890", "Inactive Customer"),
+    })
+
+    customer_map = http_client.get_customer_map_after_login(session)
+
+    assert customer_map == {"INAC67890": "Inactive Customer"}
+
+
+def test_get_customer_map_after_login_uses_unassigned_customer_placeholder():
+    session = FakeSession({
+        http_client.DEVICE_INDEX: "<table></table>",
+        http_client.DEVICE_INDEX_INACTIVE: _inactive_unassigned_device_row("S6CQ85276"),
+    })
+
+    customer_map = http_client.get_customer_map_after_login(session)
+
+    assert customer_map == {"S6CQ85276": "(No Customer Assigned)"}

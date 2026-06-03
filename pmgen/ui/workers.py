@@ -85,7 +85,11 @@ class BulkRunner(QObject):
         self.life_basis = life_basis
         self.threshold_enabled = bool(threshold_enabled)
         
-        self.customer_map = customer_map 
+        self.customer_map = {
+            str(serial).strip().upper(): customer_name
+            for serial, customer_name in (customer_map or {}).items()
+            if str(serial).strip()
+        }
 
         self._blacklist = [p.upper() for p in (cfg.blacklist or [])]
 
@@ -222,7 +226,7 @@ class BulkRunner(QObject):
                 machine_status = serial_status_map.get(serial, "")
                 self.item_updated.emit(serial, "Processing", "...", "", "", "", machine_status)
                 
-                cust_name = self.customer_map.get(serial, "")
+                cust_name = self.customer_map.get(str(serial).strip().upper(), "")
 
                 try:
                     # A. Fetch Data

@@ -91,7 +91,7 @@ class MockBulkModel(QStandardItemModel):
         super().__init__(0, 4)
         self.status_col = 1
         self.result_col = 2
-        
+
     def add_test_row(self, serial, status, result, customer):
         row = [
             QStandardItem(serial),
@@ -100,6 +100,16 @@ class MockBulkModel(QStandardItemModel):
             QStandardItem(customer)
         ]
         self.appendRow(row)
+
+
+def test_bulk_run_tab_uses_normalized_customer_map_for_table(qtbot):
+    tab = BulkRunTab(BulkConfig(), {"customer_map": {"inac67890": "Inactive Customer"}})
+    qtbot.addWidget(tab)
+
+    tab._on_item_updated("INAC67890", "Queued", "", "Unknown", "", "", "Inactive")
+
+    assert tab.model._data[0][2] == "Inactive Customer"
+    assert tab.model._data[0][3] == "Inactive"
 
 def test_proxy_model_sorting_status():
     """Test that sorting by Status applies the custom priority order."""

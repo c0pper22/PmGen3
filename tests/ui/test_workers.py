@@ -74,3 +74,14 @@ def test_bulk_runner_filters_machine_state(base_config):
     })
 
     assert serials == ["INAC67890"]
+
+
+def test_bulk_runner_normalizes_customer_map_keys(base_config):
+    runner = BulkRunner(
+        cfg=base_config,
+        threshold=0.8,
+        life_basis="page",
+        customer_map={"inac67890": "Inactive Customer"},
+    )
+
+    assert runner.customer_map["INAC67890"] == "Inactive Customer"

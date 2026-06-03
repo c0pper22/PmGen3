@@ -28,6 +28,37 @@ HEADERS_COMMON = {
 # Serial parsing (your existing code, kept intact)
 # ─────────────────────────────────────────────────────────────
 _SERIAL_RE = re.compile(r"\b[A-Z][A-Z0-9]{3}\d{5}\b", re.I)
+_NO_CUSTOMER_ASSIGNED = "(No Customer Assigned)"
+_IGNORED_CUSTOMER_VALUES = {"edit"}
+
+def _normalize_serial(value: str) -> str:
+    text = (value or "").strip().upper()
+    return text if _SERIAL_RE.fullmatch(text) else ""
+
+def _extract_serial(text: str) -> str:
+    match = _SERIAL_RE.search(text or "")
+    return _normalize_serial(match.group(0)) if match else ""
+
+def _clean_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()
+
+def _normalize_customer_value(value: str) -> str:
+    text = _clean_text(value)
+    if not text:
+        return ""
+    if "no customer assigned" in text.lower():
+        return _NO_CUSTOMER_ASSIGNED
+    if text.lower() in _IGNORED_CUSTOMER_VALUES:
+        return ""
+    return text
+
+def _customer_value_from_element(element) -> str:
+    no_customer_el = element.select_one(".noCustomerName") if hasattr(element, "select_one") else None
+    if no_customer_el is not None:
+        value = _normalize_customer_value(no_customer_el.get_text(" ", strip=True))
+        if value:
+            return value
+    return _normalize_customer_value(element.get_text(" ", strip=True))
 
 def _dedupe_preserve_order(items: Iterable[str]) -> List[str]:
     seen = set()
@@ -57,8 +88,9 @@ def parse_serial_numbers(html: str) -> List[str]:
             # <div data-serial="CNAM66582">…</div>
             for el in soup.select("[data-serial]"):
                 val = (el.get("data-serial") or "").strip()
-                if val and _SERIAL_RE.fullmatch(val):
-                    found.append(val)
+                serial = _normalize_serial(val)
+                if serial:
+                    found.append(serial)
 
             # hrefs with ?serial=XYZ or ?deviceSerial=XYZ
             for a in soup.find_all("a", href=True):
@@ -68,17 +100,78 @@ def parse_serial_numbers(html: str) -> List[str]:
                     if m:
                         cand = m.group(1).strip()
                         cand = re.sub(r"%2f|%2F|%20", "", cand)
-                        if _SERIAL_RE.fullmatch(cand):
-                            found.append(cand)
+                        serial = _normalize_serial(cand)
+                        if serial:
+                            found.append(serial)
         except Exception:
             # fall back to regex sweep
             pass
 
     # Regex sweep for stragglers (JSON-inlined, plain text tables, etc.)
     for m in _SERIAL_RE.finditer(html):
-        found.append(m.group(0))
+        found.append(_normalize_serial(m.group(0)))
 
-    return _dedupe_preserve_order(found)
+    return _dedupe_preserve_order([serial for serial in found if serial])
+
+def _customer_from_header(row, serial: str) -> str:
+    table = row.find_parent("table")
+    if table is None:
+        return ""
+
+    header_row = None
+    for candidate in table.find_all("tr"):
+        if candidate.find("th"):
+            header_row = candidate
+            break
+    if header_row is None:
+        return ""
+
+    headers = [_clean_text(cell.get_text(" ", strip=True)).lower() for cell in header_row.find_all(["th", "td"])]
+    cells = row.find_all(["td", "th"], recursive=False)
+    for index, header in enumerate(headers):
+        if "customer" not in header or index >= len(cells):
+            continue
+        value = _normalize_customer_value(cells[index].get_text(" ", strip=True))
+        if value and _extract_serial(value) != serial:
+            return value
+    return ""
+
+def _customer_from_neighbor_cell(row, serial: str) -> str:
+    cells = row.find_all(["td", "th"], recursive=False)
+    if not cells:
+        return ""
+
+    texts = [_clean_text(cell.get_text(" ", strip=True)) for cell in cells]
+    serial_index = next((index for index, text in enumerate(texts) if _extract_serial(text) == serial), -1)
+    if serial_index < 0:
+        return ""
+
+    for text in texts[serial_index + 1:]:
+        value = _normalize_customer_value(text)
+        if value and _extract_serial(value) != serial:
+            return value
+    return ""
+
+def _customer_from_row(row, serial: str) -> str:
+    for element in row.select(".noCustomerName"):
+        value = _customer_value_from_element(element)
+        if value:
+            return value
+
+    customer_selectors = [
+        ".deviceCustomers",
+        '[class*="Customer"]',
+        '[class*="customer"]',
+        '[id*="Customer"]',
+        '[id*="customer"]',
+    ]
+    for selector in customer_selectors:
+        for element in row.select(selector):
+            value = _customer_value_from_element(element)
+            if value and _extract_serial(value) != serial:
+                return value
+
+    return _customer_from_header(row, serial) or _customer_from_neighbor_cell(row, serial)
 
 def parse_customer_map(html: str) -> Dict[str, str]:
     """
@@ -93,19 +186,15 @@ def parse_customer_map(html: str) -> Dict[str, str]:
         try:
             soup = BeautifulSoup(html, "html.parser")
             
-            for serial_el in soup.select(".deviceSerialNumbers"):
-                serial = serial_el.get_text(strip=True)
-                
-                if serial:
-                    row = serial_el.find_parent("tr")
-                    
-                    if row:
-                        cust_el = row.select_one(".deviceCustomers")
-                        if cust_el:
-                            customer_name = cust_el.get_text(strip=True)
-                            
-                            if serial not in data_map:
-                                data_map[serial] = customer_name
+            for row in soup.find_all("tr"):
+                serial_el = row.select_one(".deviceSerialNumbers")
+                serial = _extract_serial(serial_el.get_text(" ", strip=True) if serial_el else row.get_text(" ", strip=True))
+                if not serial:
+                    continue
+
+                customer_name = _customer_from_row(row, serial)
+                if customer_name and serial not in data_map:
+                    data_map[serial] = customer_name
                                 
         except Exception as e:
             # Log error if needed, or pass
