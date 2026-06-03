@@ -112,7 +112,7 @@ Important `Selection.meta` keys used by UI and report layers are `watch`, `all_i
 |---|---|---|
 | `catalog_manager.db` | Working directory in source runs; AppData in frozen runs | SQLite catalog with `models`, `pm_units`, `model_catalog`, `unit_items`, `canon_mappings`, `qty_overrides`, and `per_color_units`. |
 | `inventory_cache.csv` | AppData | CSV with `Part Number`, `Unit Name`, `Quantity`, `Unit Cost`, and `Total Cost`. |
-| RIBON Access database | Configured through environment/runtime settings | ODBC source queried by `PARTS_NAME_COM`; returns rows containing a part-number field such as `PARTS_NO`. |
+| RIBON Access database | Configured through environment/runtime settings | ODBC source queried by `PARTS_NAME_COM`; returns rows containing a part-number field such as `PARTS_NO`. Requires the 64-bit Microsoft Access Database Engine driver; uninstall the x86 driver that may be installed by RIBON before installing the x64 redistributable. |
 | `debug.log` and `updater.log` | `~/.indybiz_pm` | Rolling diagnostic logs for application and updater failures. |
 
 The bundled SQLite database currently contains 47 models, 72 PM units, 594 model-unit links, 277 unit-item rows, 62 canon mappings, 5 per-color units, and 2 quantity overrides.
@@ -178,7 +178,7 @@ At runtime, `UpdateWorker` checks `c0pper22/PmGen` GitHub releases, compares the
 | HTTP | `requests`, `urllib3`, `certifi`, `charset-normalizer`, `idna` | 2.32.5, 2.5.0, 2025.10.5, 3.4.4, 3.11 | Toshiba eService login, downloads, GitHub update checks. |
 | HTML parsing | `beautifulsoup4`, `bs4`, `soupsieve` | 4.14.2, 0.0.2, 2.8 | Device index serial, customer, and description parsing. |
 | Credentials | `keyring`, `jaraco.classes`, `jaraco.context`, `jaraco.functools`, `more-itertools`, `pywin32-ctypes` | 25.6.0, 3.4.0, 6.0.1, 4.3.0, 10.8.0, 0.2.3 | OS-backed credential storage. |
-| Database | `pyodbc` | 5.3.0 | Microsoft Access RIBON lookup through ODBC. |
+| Database | `pyodbc` | 5.3.0 | Microsoft Access RIBON lookup through ODBC. Requires the x64 Microsoft Access Database Engine driver from <https://www.microsoft.com/en-us/download/details.aspx?id=54920>. |
 | Reports | `reportlab` | 4.4.4 | Individual and bulk summary PDF generation. |
 | Data processing | `numpy`, `pandas` | 2.3.5, 2.3.3 | Inventory CSV cleanup, table export, stock calculations. |
 | Packaging | `pyinstaller`, `pyinstaller-hooks-contrib` | 6.16.0, 2025.9 | Windows frozen app and updater packaging. |

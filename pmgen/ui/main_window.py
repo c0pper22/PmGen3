@@ -1119,6 +1119,7 @@ class MainWindow(QMainWindow):
                 hc.login(sess)
                 QSettings().setValue(self.AUTH_REMEMBER_KEY, remember.isChecked())
                 QSettings().setValue(self.AUTH_USERNAME_KEY, u)
+                self._session = sess
                 self._signed_in = True; self._current_user = u; self._update_auth_ui()
                 self.editor.appendPlainText(f"[Auto-Login] {u} — success")
                 self.customerMap = get_customer_map_after_login(sess)

@@ -15,6 +15,8 @@ PmGen is a Windows desktop application for generating preventive maintenance par
 
 ## Documentation
 
+User-facing usage documentation is available in [docs/user-manual.md](docs/user-manual.md).
+
 Full project documentation is available in [docs/project-summary.md](docs/project-summary.md) and [docs/project-summary.docx](docs/project-summary.docx).
 
 Architecture diagrams are stored as editable draw.io files and exported PNGs under [docs/diagrams](docs/diagrams):
@@ -30,7 +32,7 @@ Architecture diagrams are stored as editable draw.io files and exported PNGs und
 - Windows.
 - Python 3.11 or newer recommended.
 - Toshiba eService account access for live report downloads.
-- Microsoft Access ODBC driver for RIBON lookup support.
+- Microsoft Access Database Engine x64 driver for RIBON lookup support.
 - Local RIBON database access when part-number expansion is required.
 - Windows SDK `signtool.exe` and a code-signing certificate for release builds.
 
@@ -52,6 +54,19 @@ For development and tests, install the test tools used by the suite if they are 
 .\.venv\Scripts\python.exe -m pip install pytest pytest-qt openpyxl packaging
 ```
 
+### RIBON Microsoft Access Driver
+
+PmGen uses a 64-bit Python/runtime process, so RIBON lookup requires the 64-bit Microsoft Access Database Engine driver. Some RIBON installations download or install the 32-bit/x86 Access Database Engine driver, which can cause ODBC connection failures even when RIBON itself appears installed.
+
+Recommended setup:
+
+1. In Windows `Apps & features` or `Programs and Features`, uninstall the existing Microsoft Access Database Engine x86/32-bit driver if it is installed by RIBON.
+2. Install the 64-bit Microsoft Access Database Engine 2016 Redistributable from Microsoft: <https://www.microsoft.com/en-us/download/details.aspx?id=54920>.
+3. Choose the x64 installer from the Microsoft download page.
+4. Restart PmGen after installing the driver.
+
+If part-number expansion or RIBON lookup fails with an ODBC driver/provider error, verify that the x86 driver was removed and the x64 driver is installed.
+
 ## Run From Source
 
 Start the desktop app from the repository root so source-mode database lookup can find `catalog_manager.db` in the working directory:
@@ -66,7 +81,7 @@ In a frozen build, the app bootstraps `catalog_manager.db` into the application 
 
 PmGen stores normal application settings through `QSettings`, saved Toshiba eService credentials through the OS credential store via `keyring`, and diagnostic logs under `~/.indybiz_pm`.
 
-RIBON lookup uses environment/runtime configuration in [pmgen/io/ribon_db.py](pmgen/io/ribon_db.py). Configure `RIBON_DB_PATH` and `RIBON_DB_PASSWORD` in the local runtime environment rather than committing connection details.
+RIBON lookup uses environment/runtime configuration in [pmgen/io/ribon_db.py](pmgen/io/ribon_db.py). Configure `RIBON_DB_PATH` and `RIBON_DB_PASSWORD` in the local runtime environment rather than committing connection details. RIBON lookup also requires the 64-bit Microsoft Access Database Engine driver described in [RIBON Microsoft Access Driver](#ribon-microsoft-access-driver).
 
 The inventory cache is stored as `inventory_cache.csv` in the application AppData directory. It is populated from the Inventory tab by importing an inventory CSV.
 

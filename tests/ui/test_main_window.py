@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 from PyQt6.QtCore import Qt, QRegularExpression, QCoreApplication, QSettings
-from PyQt6.QtWidgets import QWidget, QToolBar, QLabel, QComboBox, QVBoxLayout, QPlainTextEdit
+from PyQt6.QtWidgets import QWidget, QToolBar, QLabel, QComboBox, QVBoxLayout, QPlainTextEdit, QLineEdit, QPushButton
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 # Import the classes we want to test
@@ -224,6 +224,52 @@ def test_generate_adds_serial_to_history_before_session_check(mock_main_window):
 
     assert window._id_combo.count() == 1
     assert window._id_combo.itemText(0) == "AB123"
+
+
+def test_manual_login_stores_authenticated_session(mock_main_window, monkeypatch):
+    """Manual login should keep the authenticated session for report generation."""
+    window = mock_main_window
+
+    class FakeSession:
+        pass
+
+    fake_session = FakeSession()
+
+    class DialogProbe(QWidget):
+        def __init__(self, parent=None, *args, **kwargs):
+            super().__init__(parent)
+            self._content_layout = QVBoxLayout(self)
+            self.accepted = False
+
+        def exec(self):
+            fields = self.findChildren(QLineEdit)
+            fields[0].setText("tech.user")
+            fields[1].setText("secret")
+            buttons = self.findChildren(QPushButton)
+            login_button = next(button for button in buttons if button.text() == "Login")
+            login_button.click()
+            return 0
+
+        def accept(self):
+            self.accepted = True
+
+    save_credentials = MagicMock()
+    login = MagicMock()
+
+    monkeypatch.setattr("pmgen.ui.main_window.FramelessDialog", DialogProbe)
+    monkeypatch.setattr("pmgen.ui.main_window.requests.Session", lambda: fake_session)
+    monkeypatch.setattr("pmgen.io.http_client.save_credentials", save_credentials)
+    monkeypatch.setattr("pmgen.io.http_client.login", login)
+    monkeypatch.setattr("pmgen.ui.main_window.get_customer_map_after_login", lambda _session: {"ABCD12345": "Customer"})
+
+    window._open_login_dialog()
+
+    save_credentials.assert_called_once_with("tech.user", "secret")
+    login.assert_called_once_with(fake_session)
+    assert window._session is fake_session
+    assert window._signed_in is True
+    assert window._current_user == "tech.user"
+    assert window.customerMap == {"ABCD12345": "Customer"}
 
 
 def test_show_about_uses_db_models(mock_main_window, monkeypatch):
