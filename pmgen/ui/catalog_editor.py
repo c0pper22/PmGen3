@@ -839,7 +839,7 @@ class PerColorUnitsTab(_EditorTabBase):
 
         root = QVBoxLayout(self)
         top = QHBoxLayout()
-        title = QLabel("PM Units counted once per color channel")
+        title = QLabel("Color PM units counted once per due color")
         title.setObjectName("DialogLabel")
         top.addWidget(title, 1)
         self.btn_save = QPushButton("Save")
@@ -851,8 +851,9 @@ class PerColorUnitsTab(_EditorTabBase):
         root.addLayout(top)
 
         helper = QLabel(
-            "When a PM Unit is in this list, it is counted once per color channel (K/C/M/Y) "
-            "rather than once per matching canon item."
+            "Use this for color-specific PM units. If several canon items for the same color are due, "
+            "PmGen counts that PM unit once for that color, not once per item. "
+            "K/C/M/Y means black, cyan, magenta, and yellow."
         )
         helper.setObjectName("DialogLabel")
         helper.setWordWrap(True)
@@ -1208,7 +1209,7 @@ class CatalogEditorWindow(QMainWindow):
         self.tabs.addTab(self.tab_qty, "Quantity Overrides")
         self.tabs.setTabToolTip(
             per_color_idx,
-            "Counts listed PM Units once per color channel (K/C/M/Y) instead of once per matching canon item.",
+            "Prevents double-counting color-specific PM units when several items for the same color are due.",
         )
         self._register_dirty_tab_markers()
         self.tabs.currentChanged.connect(self._on_tab_changed)

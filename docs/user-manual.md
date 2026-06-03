@@ -375,7 +375,7 @@ For new catalog data, use this order:
 1. `Canon Mappings` if you need a new canon item name from raw report text.
 2. `PM Units` to define the PM unit and select canon items inside it.
 3. `Models` to link PM units to machine models.
-4. `Per Color Units` if a PM unit should count once for each color channel.
+4. `Per Color Units` if a color-specific PM unit should not be counted more than once for the same color.
 5. `Quantity Overrides` if a PM unit needs a fixed quantity.
 
 The visible tab order is optimized for browsing. `Save All` uses a safe save order internally so dependent tabs can refresh correctly.
@@ -456,7 +456,13 @@ Validation prevents blank rows, duplicate patterns, unknown helper tokens, inval
 
 ### Per Color Units Tab
 
-The Per Color Units tab marks PM units that should be counted once per color channel, usually K/C/M/Y, instead of once per matching canon item.
+The Per Color Units tab prevents double-counting color-specific PM units.
+
+Some PM units are sold or handled by color: `K` for black, `C` for cyan, `M` for magenta, and `Y` for yellow. A PM Support report can show several due canon items inside the same color unit. If those items all point to the same PM unit, PmGen should usually recommend one unit for that color, not one unit for every due item.
+
+Example: if `DRUM[K]` and `GRID[K]` are both due and both belong to the same black PM unit, checking that PM unit here tells PmGen to count `1` black unit, not `2`. If black and cyan are both due, PmGen can count `2` total: one for black and one for cyan.
+
+Use this tab for PM units that are color-specific kits and may contain multiple canon items for the same color. Do not use it for normal one-per-machine kits.
 
 Use the checkbox list to select PM units. The list comes from the PM Units tab. Stale items are shown with `(not in PM Units)` and must be fixed before saving.
 
@@ -562,6 +568,6 @@ Save the changed tab or click `Save All`. Dependent tabs refresh from saved cata
 | RIBON | Local database used to resolve PM units to orderable part numbers. |
 | Threshold | Optional percentage below 100% where PmGen can mark an item due early. |
 | Life basis | Whether page counters or drive counters are preferred when calculating life used. |
-| Per-color unit | A PM unit counted once for each color channel. |
+| Per-color unit | A color-specific PM unit that PmGen counts once per due color, even if several items inside that same color unit are due. |
 | Quantity override | A fixed quantity rule for a PM unit. |
 | Bulk final summary | PDF combining the top machines from a bulk run and their selected parts. |
