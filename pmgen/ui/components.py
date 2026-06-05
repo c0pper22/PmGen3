@@ -1,11 +1,12 @@
-import os
 from dataclasses import dataclass
 from PyQt6.QtCore import Qt, QPoint, QRect
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QWidget, QMainWindow, QLabel, QDialog, QHBoxLayout, 
     QToolButton, QVBoxLayout, QFrame, QPushButton, QSizePolicy, QProgressBar
 )
+
+from .icons import set_themed_icon
 
 # ---------------------------- Drag Helpers ----------------------------
 class DragRegion(QWidget):
@@ -105,17 +106,18 @@ class DialogTitleBar(QWidget):
         lbl.setObjectName("DialogTitleLabel")
 
         btn_min = QToolButton(self); btn_min.setObjectName("DialogBtn")
-        btn_min.setIcon(QIcon(os.path.join(icon_dir, "minimize.svg"))); btn_min.setToolTip("Minimize")
+        set_themed_icon(btn_min, "minimize", icon_dir); btn_min.setToolTip("Minimize")
         btn_min.clicked.connect(self._win.showMinimized)
 
-        self._act_max = QAction(QIcon(os.path.join(icon_dir, "fullscreen.svg")), "Maximize", self)
+        self._act_max = QAction("Maximize", self)
+        set_themed_icon(self._act_max, "fullscreen", icon_dir)
         self._act_max.setCheckable(True)
         self._act_max.triggered.connect(self._toggle_max_restore)
         btn_max = QToolButton(self); btn_max.setObjectName("DialogBtn")
         btn_max.setDefaultAction(self._act_max)
 
         btn_close = QToolButton(self); btn_close.setObjectName("DialogBtn")
-        btn_close.setIcon(QIcon(os.path.join(icon_dir, "exit.svg"))); btn_close.setToolTip("Close")
+        set_themed_icon(btn_close, "exit", icon_dir); btn_close.setToolTip("Close")
         btn_close.clicked.connect(self._win.close)
 
         layout.addWidget(lbl, 1, Qt.AlignmentFlag.AlignVCenter)
@@ -167,6 +169,7 @@ class FramelessDialog(QDialog):
         sep.setFrameShape(QFrame.Shape.NoFrame)
         outer.addWidget(sep)
         self._content = QWidget(self)
+        self._content.setObjectName("DialogContent")
         self._content_layout = QVBoxLayout(self._content)
         self._content_layout.setContentsMargins(12, 12, 12, 12)
         self._content_layout.setSpacing(12)

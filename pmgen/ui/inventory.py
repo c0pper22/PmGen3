@@ -5,13 +5,13 @@ import pandas as pd
 import logging
 from pmgen.system.wrappers import safe_slot
 from PyQt6.QtCore import Qt, QAbstractTableModel, QStandardPaths, QModelIndex
-from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QTableView, QFileDialog, QHeaderView, QApplication, QMessageBox
 )
 
 from .components import CustomMessageBox
+from .icons import set_themed_icon
 from .theme import SPACING_MD, SPACING_SM
 from .widgets import configure_table_view, make_card
 
@@ -237,21 +237,21 @@ class InventoryTab(QWidget):
         self.btn_load = QPushButton("Import")
         self.btn_load.setProperty("class", "primary")
         self.btn_load.setToolTip("Import Inventory CSV")
-        self.btn_load.setIcon(QIcon.fromTheme("document-open")) 
+        set_themed_icon(self.btn_load, "import", self.icon_dir, role="primary")
         self.btn_load.clicked.connect(self._load_csv)
         self.btn_load.setFixedHeight(32)
 
         self.btn_add = QPushButton("Add Item")
         self.btn_add.setProperty("class", "secondary")
         self.btn_add.setToolTip("Add a new empty row")
-        self.btn_add.setIcon(QIcon.fromTheme("list-add"))
+        set_themed_icon(self.btn_add, "add", self.icon_dir)
         self.btn_add.clicked.connect(self._add_new_row)
         self.btn_add.setFixedHeight(32)
 
         self.btn_delete = QPushButton("Delete")
         self.btn_delete.setProperty("class", "danger")
         self.btn_delete.setToolTip("Delete selected rows")
-        self.btn_delete.setIcon(QIcon.fromTheme("edit-delete"))
+        set_themed_icon(self.btn_delete, "delete", self.icon_dir, role="danger")
         self.btn_delete.clicked.connect(self._delete_selected)
         self.btn_delete.setFixedHeight(32)
         

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from PyQt6.QtCore import QEvent, QPoint, QRect, Qt
-from PyQt6.QtGui import QAction, QCursor, QIcon
+from PyQt6.QtGui import QAction, QCursor
 from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QSizePolicy, QToolButton, QWidget
 
 from .components import (
@@ -20,6 +20,7 @@ from .components import (
     ResizeState,
     TitleDragLabel,
 )
+from .icons import set_themed_icon
 
 BORDER_WIDTH = 8
 TOP_BAR_HEIGHT = 64
@@ -47,7 +48,8 @@ class WindowControlSpec:
 
 
 def _icon_action(icon_dir: str, icon_name: str, text: str, parent: QWidget, callback) -> QAction:
-    action = QAction(QIcon(os.path.join(icon_dir, icon_name)), text, parent)
+    action = QAction(text, parent)
+    set_themed_icon(action, icon_name.removesuffix(".svg"), icon_dir)
     action.triggered.connect(callback)
     return action
 
@@ -75,11 +77,7 @@ def build_frameless_top_bar(window: QMainWindow, spec: WindowControlSpec) -> QWi
     if spec.show_update:
         btn_update = QToolButton(controls)
         btn_update.setObjectName("DialogBtn")
-        icon_path = os.path.join(spec.icon_dir, "update.svg")
-        if os.path.exists(icon_path):
-            btn_update.setIcon(QIcon(icon_path))
-        else:
-            btn_update.setText("Update")
+        set_themed_icon(btn_update, "update", spec.icon_dir)
         btn_update.setToolTip("Check for Updates")
         if spec.on_update is not None:
             btn_update.clicked.connect(spec.on_update)
@@ -89,7 +87,8 @@ def build_frameless_top_bar(window: QMainWindow, spec: WindowControlSpec) -> QWi
     btn_min.setObjectName("DialogBtn")
     btn_min.setDefaultAction(_icon_action(spec.icon_dir, "minimize.svg", "Minimize", window, spec.on_minimize))
 
-    window._act_full = QAction(QIcon(os.path.join(spec.icon_dir, "fullscreen.svg")), "Maximize", window)
+    window._act_full = QAction("Maximize", window)
+    set_themed_icon(window._act_full, "fullscreen", spec.icon_dir)
     window._act_full.setCheckable(True)
     window._act_full.triggered.connect(spec.on_toggle_fullscreen)
     btn_full = QToolButton(controls)

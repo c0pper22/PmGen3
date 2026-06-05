@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 from PyQt6.QtCore import QCoreApplication, QSettings
 from PyQt6.QtWidgets import QApplication
@@ -47,3 +48,25 @@ def test_qss_bodies_do_not_define_raw_hex_literals():
     qss_source = source[source.index("def _qss("):source.index("LIGHT_QSS = _qss")]
 
     assert not re.search(r"#[0-9A-Fa-f]{3,6}", qss_source)
+
+
+def test_combo_box_theme_arrows_are_defined():
+    icon_dir = Path(theme.__file__).resolve().parents[1] / "assets" / "icons"
+
+    assert (icon_dir / "combo-down-dark.svg").exists()
+    assert (icon_dir / "combo-down-light.svg").exists()
+    assert "combo-down-dark.svg" in DARK_QSS
+    assert "combo-down-light.svg" in LIGHT_QSS
+
+
+def test_spin_box_theme_arrows_are_defined():
+    icon_dir = Path(theme.__file__).resolve().parents[1] / "assets" / "icons"
+
+    assert (icon_dir / "up-dark.svg").exists()
+    assert (icon_dir / "up-light.svg").exists()
+    assert (icon_dir / "down-dark.svg").exists()
+    assert (icon_dir / "down-light.svg").exists()
+    assert "up-dark.svg" in DARK_QSS
+    assert "down-dark.svg" in DARK_QSS
+    assert "up-light.svg" in LIGHT_QSS
+    assert "down-light.svg" in LIGHT_QSS

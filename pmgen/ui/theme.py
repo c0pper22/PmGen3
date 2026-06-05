@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PyQt6.QtCore import QObject, QSettings
 from PyQt6.QtWidgets import QApplication
+
+from .icons import refresh_themed_icons
 
 # Surfaces
 COLOR_SURFACE = "#e9edff"
@@ -77,6 +81,13 @@ COLOR_DANGER_BG = "#ffdad6"
 # Typography
 FONT_HEADING = "Hanken Grotesk"
 FONT_BODY = "Inter"
+_ICON_DIR = Path(__file__).resolve().parents[1] / "assets" / "icons"
+_COMBO_DOWN_DARK = _ICON_DIR / "combo-down-dark.svg"
+_COMBO_DOWN_LIGHT = _ICON_DIR / "combo-down-light.svg"
+_SPIN_UP_DARK = _ICON_DIR / "up-dark.svg"
+_SPIN_UP_LIGHT = _ICON_DIR / "up-light.svg"
+_SPIN_DOWN_DARK = _ICON_DIR / "down-dark.svg"
+_SPIN_DOWN_LIGHT = _ICON_DIR / "down-light.svg"
 TYPO_HEADLINE_LG = (24, 600, 32, 0.00)
 TYPO_HEADLINE_MD = (20, 600, 28, 0.00)
 TYPO_HEADLINE_SM = (16, 600, 24, 0.00)
@@ -154,7 +165,13 @@ def _qss(
     primary_hover: str,
     danger: str,
     danger_bg: str,
+    combo_arrow: Path,
+    spin_up_arrow: Path,
+    spin_down_arrow: Path,
 ) -> str:
+    combo_arrow_url = combo_arrow.as_posix()
+    spin_up_arrow_url = spin_up_arrow.as_posix()
+    spin_down_arrow_url = spin_down_arrow.as_posix()
     return f"""
 QMainWindow, QDialog, QWidget {{
     background: {bg};
@@ -279,6 +296,48 @@ QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus, QDoubleS
 QComboBox::drop-down {{
     border-left: 1px solid {subtle_border};
     width: 24px;
+}}
+QComboBox::down-arrow {{
+    image: url("{combo_arrow_url}");
+    width: 10px;
+    height: 6px;
+}}
+QComboBox#IdInput QLineEdit {{
+    padding-right: 28px;
+}}
+QSpinBox, QDoubleSpinBox {{
+    padding-right: 28px;
+}}
+QSpinBox::up-button, QDoubleSpinBox::up-button {{
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 24px;
+    border-left: 1px solid {subtle_border};
+    border-bottom: 1px solid {subtle_border};
+    border-top-right-radius: {RADIUS_SM}px;
+    background: transparent;
+}}
+QSpinBox::down-button, QDoubleSpinBox::down-button {{
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 24px;
+    border-left: 1px solid {subtle_border};
+    border-bottom-right-radius: {RADIUS_SM}px;
+    background: transparent;
+}}
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+    background: {surface_high};
+}}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    image: url("{spin_up_arrow_url}");
+    width: 10px;
+    height: 6px;
+}}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    image: url("{spin_down_arrow_url}");
+    width: 10px;
+    height: 6px;
 }}
 QComboBox QAbstractItemView, #IdCompleterPopup {{
     background: {surface};
@@ -438,6 +497,14 @@ QDialog#FramelessDialogRoot {{
     border-top-left-radius: {RADIUS_LG}px;
     border-top-right-radius: {RADIUS_LG}px;
 }}
+#DialogContent {{
+    background: {surface};
+    border-left: 1px solid {border};
+    border-right: 1px solid {border};
+    border-bottom: 1px solid {border};
+    border-bottom-left-radius: {RADIUS_LG}px;
+    border-bottom-right-radius: {RADIUS_LG}px;
+}}
 #DialogTitleLabel {{
     color: {text};
     font-weight: 600;
@@ -481,6 +548,9 @@ LIGHT_QSS = _qss(
     primary_hover=COLOR_PRIMARY_CONTAINER,
     danger=COLOR_DANGER,
     danger_bg=COLOR_DANGER_BG,
+    combo_arrow=_COMBO_DOWN_LIGHT,
+    spin_up_arrow=_SPIN_UP_LIGHT,
+    spin_down_arrow=_SPIN_DOWN_LIGHT,
 )
 
 DARK_QSS = _qss(
@@ -497,6 +567,9 @@ DARK_QSS = _qss(
     primary_hover=COLOR_PRIMARY_CONTAINER,
     danger=COLOR_DANGER,
     danger_bg=DARK_SURFACE_HIGH,
+    combo_arrow=_COMBO_DOWN_DARK,
+    spin_up_arrow=_SPIN_UP_DARK,
+    spin_down_arrow=_SPIN_DOWN_DARK,
 )
 
 GLOBAL_STYLE_DARK = DARK_QSS
@@ -520,12 +593,16 @@ class ThemeManager(QObject):
         self._app.setStyle("Fusion")
         self._app.setStyleSheet(LIGHT_QSS)
         self._is_dark = False
+        self._app.setProperty("pmgenThemeMode", "light")
+        refresh_themed_icons(self._app, self._is_dark)
         self.save_mode("light")
 
     def apply_dark(self) -> None:
         self._app.setStyle("Fusion")
         self._app.setStyleSheet(DARK_QSS)
         self._is_dark = True
+        self._app.setProperty("pmgenThemeMode", "dark")
+        refresh_themed_icons(self._app, self._is_dark)
         self.save_mode("dark")
 
     def toggle(self) -> None:
