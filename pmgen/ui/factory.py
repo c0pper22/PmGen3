@@ -36,14 +36,6 @@ class UIFactory:
         tb.setContentsMargins(0, 0, 0, 0)
         tb.setMouseTracking(True)
 
-        bar = QWidget()
-        bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        bar.setMouseTracking(True)
-        
-        h = QHBoxLayout(bar)
-        h.setContentsMargins(BORDER_WIDTH, BORDER_WIDTH, BORDER_WIDTH, 0)
-        h.setSpacing(0)
-
         # --- Settings Menu ---
         settings_btn = QToolButton()
         settings_btn.setObjectName("SettingsBtn")
@@ -145,8 +137,9 @@ class UIFactory:
         )
         h = bar.layout()
         nav = QWidget(bar)
+        nav.setObjectName("TopBarNav")
         nav_l = QHBoxLayout(nav)
-        nav_l.setContentsMargins(0, 0, SPACING_MD, 0)
+        nav_l.setContentsMargins(8, 0, 16, 0)
         nav_l.setSpacing(SPACING_SM)
         nav_l.addWidget(settings_btn)
         nav_l.addWidget(bulk_btn)

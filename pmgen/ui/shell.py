@@ -23,7 +23,7 @@ from .components import (
 from .icons import set_themed_icon
 
 BORDER_WIDTH = 8
-TOP_BAR_HEIGHT = 64
+TOP_BAR_HEIGHT = 56
 SIDEBAR_WIDTH_EXPANDED = 240
 SIDEBAR_WIDTH_COLLAPSED = 64
 
@@ -66,10 +66,13 @@ def build_frameless_top_bar(window: QMainWindow, spec: WindowControlSpec) -> QWi
     layout.setSpacing(0)
 
     left_drag = DragRegion(window)
+    left_drag.setObjectName("TopBarDragRegion")
     title = TitleDragLabel(spec.title, window)
     right_drag = DragRegion(window)
+    right_drag.setObjectName("TopBarDragRegion")
 
     controls = QWidget(bar)
+    controls.setObjectName("TopBarControls")
     control_layout = QHBoxLayout(controls)
     control_layout.setContentsMargins(0, 0, 0, 0)
     control_layout.setSpacing(0)
@@ -77,6 +80,7 @@ def build_frameless_top_bar(window: QMainWindow, spec: WindowControlSpec) -> QWi
     if spec.show_update:
         btn_update = QToolButton(controls)
         btn_update.setObjectName("DialogBtn")
+        btn_update.setFixedSize(36, 36)
         set_themed_icon(btn_update, "update", spec.icon_dir)
         btn_update.setToolTip("Check for Updates")
         if spec.on_update is not None:
@@ -85,6 +89,7 @@ def build_frameless_top_bar(window: QMainWindow, spec: WindowControlSpec) -> QWi
 
     btn_min = QToolButton(controls)
     btn_min.setObjectName("DialogBtn")
+    btn_min.setFixedSize(36, 36)
     btn_min.setDefaultAction(_icon_action(spec.icon_dir, "minimize.svg", "Minimize", window, spec.on_minimize))
 
     window._act_full = QAction("Maximize", window)
@@ -93,10 +98,12 @@ def build_frameless_top_bar(window: QMainWindow, spec: WindowControlSpec) -> QWi
     window._act_full.triggered.connect(spec.on_toggle_fullscreen)
     btn_full = QToolButton(controls)
     btn_full.setObjectName("DialogBtn")
+    btn_full.setFixedSize(36, 36)
     btn_full.setDefaultAction(window._act_full)
 
     btn_close = QToolButton(controls)
     btn_close.setObjectName("DialogBtn")
+    btn_close.setFixedSize(36, 36)
     btn_close.setDefaultAction(_icon_action(spec.icon_dir, "exit.svg", "Close", window, spec.on_close))
 
     control_layout.addWidget(btn_min)

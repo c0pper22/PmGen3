@@ -59,14 +59,14 @@ COLOR_INVERSE_SURFACE = "#1d3054"
 COLOR_INVERSE_ON_SURFACE = "#edf0ff"
 
 # Dark mode
-DARK_BACKGROUND = "#0B121F"
-DARK_SURFACE = "#161C27"
-DARK_SURFACE_CONTAINER = "#1E2738"
-DARK_SURFACE_HIGH = "#252D3D"
-DARK_BORDER = "#252D3D"
-DARK_ON_SURFACE = "#edf0ff"
-DARK_ON_SURFACE_VARIANT = "#9ca3b8"
-DARK_OUTLINE = "#3d4560"
+DARK_BACKGROUND = "#0E1014"
+DARK_SURFACE = "#171A20"
+DARK_SURFACE_CONTAINER = "#20242C"
+DARK_SURFACE_HIGH = "#2A2F38"
+DARK_BORDER = "#303642"
+DARK_OUTLINE = "#4A505C"
+DARK_ON_SURFACE = "#F1F3F5"
+DARK_ON_SURFACE_VARIANT = "#A7ADB7"
 DARK_PRIMARY = "#b2c5ff"
 DARK_PRIMARY_CONTAINER = "#0040a2"
 
@@ -108,6 +108,7 @@ SPACING_CONTAINER_MARGIN = 24
 SPACING_GUTTER = 16
 
 # Radius
+RADIUS_NONE = 0
 RADIUS_SM = 2
 RADIUS_DEFAULT = 4
 RADIUS_MD = 6
@@ -209,13 +210,15 @@ QLabel[class="warning-banner"] {{
 QToolBar {{
     background: {surface};
     border: none;
-    border-bottom: 1px solid {border};
     spacing: 0px;
     padding: 0px;
 }}
 #TopBarBg {{
     background: {surface};
     border-bottom: 1px solid {border};
+}}
+#TopBarNav, #TopBarControls, #TopBarDragRegion {{
+    background: transparent;
 }}
 QLabel#TitleLabel {{
     color: {text};
@@ -233,7 +236,8 @@ QToolButton {{
 QToolButton:hover {{ background-color: {surface_high}; }}
 QToolButton#SettingsBtn, QToolButton#BulkBtn {{
     font-weight: 600;
-    min-height: 36px;
+    min-height: 32px;
+    padding: {SPACING_SM}px {SPACING_MD}px;
 }}
 QToolButton#SettingsBtn::menu-indicator, QToolButton#BulkBtn::menu-indicator {{
     image: none;
@@ -510,8 +514,14 @@ QDialog#FramelessDialogRoot {{
     font-weight: 600;
 }}
 #DialogBtn {{
-    padding: {SPACING_SM}px;
+    padding: {SPACING_XS}px;
     border-radius: {RADIUS_DEFAULT}px;
+}}
+#TopBarControls QToolButton#DialogBtn {{
+    min-width: 36px;
+    min-height: 36px;
+    max-width: 36px;
+    max-height: 36px;
 }}
 #DialogSeparator {{
     background: {subtle_border};

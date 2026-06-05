@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 # Imports from our new split files
 from pmgen.ui.bulk_model import BulkQueueModel
 from pmgen.system.wrappers import safe_slot
-from .theme import SPACING_LG, apply_static_theme
+from .theme import SPACING_LG, SPACING_MD, apply_static_theme
 from .components import (
     DragRegion, TitleDragLabel, FramelessDialog, CustomMessageBox, ResizeState, LoadingDialog
 )
@@ -548,7 +548,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         central.setMouseTracking(True)
         
         self._vbox = QVBoxLayout(central)
-        self._vbox.setContentsMargins(SPACING_LG, SPACING_LG, SPACING_LG, SPACING_LG)
+        self._vbox.setContentsMargins(SPACING_LG, SPACING_MD, SPACING_LG, SPACING_LG)
         self._vbox.setSpacing(0)
 
         self.tabs = DashboardTabs()
