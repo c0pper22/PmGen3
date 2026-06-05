@@ -513,6 +513,18 @@ QDialog#FramelessDialogRoot {{
     color: {text};
     font-weight: 600;
 }}
+#DialogSection {{
+    background: {surface_low};
+    border: 1px solid {subtle_border};
+    border-radius: {RADIUS_LG}px;
+}}
+#DialogSectionTitle {{
+    color: {text};
+    font-weight: 700;
+}}
+#DialogFormLabel {{
+    color: {muted};
+}}
 #DialogBtn {{
     padding: {SPACING_XS}px;
     border-radius: {RADIUS_DEFAULT}px;

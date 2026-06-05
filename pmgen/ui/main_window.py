@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QToolBar, QSizePolicy, QToolButton, QHBoxLayout, QLabel, QMenu,
     QPushButton, QLineEdit, QComboBox, QCheckBox, QSlider, 
     QSpinBox, QDoubleSpinBox, QFileDialog, QProgressBar, QCompleter,
-    QTabWidget, QTableView, QHeaderView, QSplitter, QTabBar,
+    QTabWidget, QTableView, QHeaderView, QSplitter, QTabBar, QGridLayout,
     QProgressDialog
 )
 
@@ -1160,33 +1160,58 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         cfg = self._get_bulk_config()
         s = QSettings()
         dlg = FramelessDialog(self, "Bulk Settings", self._icon_dir)
+        dlg.setMinimumSize(780, 800)
+        dlg.resize(780, 800)
 
-        # Build UI rows manually to save vertical space
-        def _row(label, widget): 
-            r = QHBoxLayout()
-            r.addWidget(QLabel(label, dlg))
-            r.addStretch(1)
-            r.addWidget(widget)
-            return r
+        def _section(title: str):
+            section = QWidget(dlg)
+            section.setObjectName("DialogSection")
+            section.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            section_layout = QVBoxLayout(section)
+            section_layout.setContentsMargins(12, 10, 12, 12)
+            section_layout.setSpacing(8)
+            title_label = QLabel(title, section)
+            title_label.setObjectName("DialogSectionTitle")
+            section_layout.addWidget(title_label)
+            return section, section_layout
+
+        def _form_label(text: str, parent: QWidget):
+            label = QLabel(text, parent)
+            label.setObjectName("DialogFormLabel")
+            return label
+
+        def _set_field_width(widget, width=140):
+            widget.setMinimumWidth(width)
+            widget.setMaximumWidth(width)
+            widget.setMinimumHeight(34)
+            return widget
+
+        def _grid_row(grid: QGridLayout, row: int, label: str, widget, parent: QWidget):
+            grid.addWidget(_form_label(label, parent), row, 0, Qt.AlignmentFlag.AlignVCenter)
+            grid.addWidget(widget, row, 1, Qt.AlignmentFlag.AlignRight)
         
         # --- Standard Config ---
-        sp_top = QSpinBox(dlg); sp_top.setObjectName("DialogInput"); sp_top.setRange(1, 9999); sp_top.setValue(cfg.top_n)
-        sp_pool = QSpinBox(dlg); sp_pool.setObjectName("DialogInput"); sp_pool.setRange(1, 16); sp_pool.setValue(cfg.pool_size)
+        sp_top = _set_field_width(QSpinBox(dlg), 180); sp_top.setObjectName("DialogInput"); sp_top.setRange(1, 9999); sp_top.setValue(cfg.top_n)
+        sp_pool = _set_field_width(QSpinBox(dlg), 180); sp_pool.setObjectName("DialogInput"); sp_pool.setRange(1, 16); sp_pool.setValue(cfg.pool_size)
         machine_box = QComboBox(dlg); machine_box.setObjectName("DialogInput")
         for label, value in (("Both", "both"), ("Active", "active"), ("Inactive", "inactive")):
             machine_box.addItem(label, value)
         machine_box.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         machine_box.setMinimumContentsLength(len("Inactive"))
-        machine_box.setMinimumWidth(machine_box.fontMetrics().horizontalAdvance("Inactive") + 48)
+        machine_box.setMinimumWidth(180)
+        machine_box.setMaximumWidth(180)
+        machine_box.setMinimumHeight(34)
         machine_box.view().setMinimumWidth(machine_box.minimumWidth())
         machine_box.view().setTextElideMode(Qt.TextElideMode.ElideNone)
         machine_idx = machine_box.findData(cfg.machine_filter)
         machine_box.setCurrentIndex(machine_idx if machine_idx >= 0 else 0)
         cb_gen_pdfs = QCheckBox("Generate PDF Reports", dlg)
         cb_gen_pdfs.setObjectName("DialogCheckbox")
+        cb_gen_pdfs.setMinimumHeight(30)
         cb_gen_pdfs.setChecked(cfg.generate_pdfs)
         ed_dir = QLineEdit(cfg.out_dir, dlg); ed_dir.setObjectName("DialogInput")
-        btn_br = QPushButton("Browse", dlg); btn_br.clicked.connect(lambda: ed_dir.setText(QFileDialog.getExistingDirectory(self, "Out", cfg.out_dir) or cfg.out_dir))
+        ed_dir.setMinimumHeight(34)
+        btn_br = QPushButton("Browse", dlg); btn_br.setFixedSize(112, 34); btn_br.clicked.connect(lambda: ed_dir.setText(QFileDialog.getExistingDirectory(self, "Out", cfg.out_dir) or cfg.out_dir))
         
         def toggle_out_dir(checked):
             ed_dir.setEnabled(checked)
@@ -1194,29 +1219,32 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         cb_gen_pdfs.toggled.connect(toggle_out_dir)
         toggle_out_dir(cfg.generate_pdfs)
 
-        bl_edit = QPlainTextEdit(dlg); bl_edit.setObjectName("MainEditor"); bl_edit.setFixedHeight(60)
+        bl_edit = QPlainTextEdit(dlg); bl_edit.setObjectName("MainEditor"); bl_edit.setFixedHeight(72)
         bl_edit.setPlainText("\n".join(cfg.blacklist or []))
         
         # --- Date Filters (Max Age / Min Age) ---
         
         # 1. Max Age (Existing: "Unpack Filter")
-        cb_max_age = QCheckBox("Exclude if OLDER than (Months):", dlg); cb_max_age.setObjectName("DialogCheckbox")
+        cb_max_age = QCheckBox("Exclude older than", dlg); cb_max_age.setObjectName("DialogCheckbox"); cb_max_age.setMinimumHeight(30)
         cb_max_age.setChecked(bool(s.value("bulk/unpack_filter_enabled", False, bool)))
-        sp_max_age = QSpinBox(dlg); sp_max_age.setObjectName("DialogInput"); sp_max_age.setRange(0, 120)
+        sp_max_age = _set_field_width(QSpinBox(dlg), 96); sp_max_age.setObjectName("DialogInput"); sp_max_age.setRange(0, 120)
         sp_max_age.setValue(int(s.value("bulk/unpack_extra_months", 0, int))) # Reusing existing key
         
         # 2. Min Age (New)
-        cb_min_age = QCheckBox("Exclude if NEWER than (Months):", dlg); cb_min_age.setObjectName("DialogCheckbox")
+        cb_min_age = QCheckBox("Exclude newer than", dlg); cb_min_age.setObjectName("DialogCheckbox"); cb_min_age.setMinimumHeight(30)
         cb_min_age.setChecked(bool(s.value("bulk/unpack_min_filter_enabled", False, bool)))
-        sp_min_age = QSpinBox(dlg); sp_min_age.setObjectName("DialogInput"); sp_min_age.setRange(0, 120)
+        sp_min_age = _set_field_width(QSpinBox(dlg), 96); sp_min_age.setObjectName("DialogInput"); sp_min_age.setRange(0, 120)
         sp_min_age.setValue(int(s.value("bulk/unpack_min_months", 0, int)))
 
         btn_save = QPushButton("Save", dlg)
+        btn_save.setProperty("class", "primary")
+        btn_save.setFixedSize(120, 40)
 
         # --- Custom 08 Filters ---
         cb_cust_name = QLineEdit(cfg.custom_08_name, dlg); cb_cust_name.setObjectName("DialogInput")
+        cb_cust_name.setMinimumHeight(34)
         cb_cust_name.setPlaceholderText("Column Name (e.g. Total Pages)")
-        sp_cust_code = QSpinBox(dlg); sp_cust_code.setObjectName("DialogInput")
+        sp_cust_code = _set_field_width(QSpinBox(dlg), 180); sp_cust_code.setObjectName("DialogInput")
         sp_cust_code.setRange(0, 999999); sp_cust_code.setValue(cfg.custom_08_code)
 
         def _save():
@@ -1243,27 +1271,69 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         btn_save.clicked.connect(_save)
 
         l = dlg._content_layout
-        l.addLayout(_row("Top N serials:", sp_top))
-        l.addLayout(_row("Parallel workers:", sp_pool))
-        l.addLayout(_row("Active/Inactive filter:", machine_box))
-        
-        l.addWidget(cb_gen_pdfs)
+        l.setSpacing(10)
 
-        r_dir = QHBoxLayout(); r_dir.addWidget(QLabel("Out Dir:", dlg)); r_dir.addWidget(ed_dir, 1); r_dir.addWidget(btn_br); l.addLayout(r_dir)
-        
-        l.addWidget(QLabel("Blacklist:", dlg)); l.addWidget(bl_edit)
-        
-        # Add the two filter rows
-        r_min = QHBoxLayout(); r_min.addWidget(cb_min_age); r_min.addStretch(1); r_min.addWidget(sp_min_age); l.addLayout(r_min)
-        r_max = QHBoxLayout(); r_max.addWidget(cb_max_age); r_max.addStretch(1); r_max.addWidget(sp_max_age); l.addLayout(r_max)
-        
-        r_btn = QHBoxLayout(); r_btn.addStretch(1); r_btn.addWidget(btn_save); l.addLayout(r_btn)
+        general_section, general_layout = _section("General")
+        general_grid = QGridLayout()
+        general_grid.setContentsMargins(0, 0, 0, 0)
+        general_grid.setHorizontalSpacing(16)
+        general_grid.setVerticalSpacing(8)
+        general_grid.setColumnStretch(0, 1)
+        _grid_row(general_grid, 0, "Top N serials", sp_top, general_section)
+        _grid_row(general_grid, 1, "Parallel workers", sp_pool, general_section)
+        _grid_row(general_grid, 2, "Machine filter", machine_box, general_section)
+        general_layout.addLayout(general_grid)
 
-        l.addWidget(QLabel("Custom 08 Tracking:", dlg))
-        l.addLayout(_row("      Column Name:", cb_cust_name))
-        l.addLayout(_row("      08 Code (0 = Disabled):", sp_cust_code))
-        
-        r_btn = QHBoxLayout(); r_btn.addStretch(1); r_btn.addWidget(btn_save); l.addLayout(r_btn)
+        custom_section, custom_layout = _section("Custom 08 Tracking")
+        custom_grid = QGridLayout()
+        custom_grid.setContentsMargins(0, 0, 0, 0)
+        custom_grid.setHorizontalSpacing(16)
+        custom_grid.setVerticalSpacing(8)
+        custom_grid.setColumnStretch(0, 1)
+        custom_grid.addWidget(_form_label("Column name", custom_section), 0, 0, Qt.AlignmentFlag.AlignVCenter)
+        custom_grid.addWidget(cb_cust_name, 0, 1)
+        _grid_row(custom_grid, 1, "08 code", sp_cust_code, custom_section)
+        custom_layout.addLayout(custom_grid)
+
+        top_sections = QHBoxLayout()
+        top_sections.setContentsMargins(0, 0, 0, 0)
+        top_sections.setSpacing(10)
+        top_sections.addWidget(general_section, 1)
+        top_sections.addWidget(custom_section, 1)
+        l.addLayout(top_sections)
+
+        output_section, output_layout = _section("Output")
+        output_layout.addWidget(cb_gen_pdfs)
+        r_dir = QHBoxLayout()
+        r_dir.setContentsMargins(0, 0, 0, 0)
+        r_dir.setSpacing(8)
+        r_dir.addWidget(ed_dir, 1)
+        r_dir.addWidget(btn_br)
+        output_layout.addWidget(_form_label("Output directory", output_section))
+        output_layout.addLayout(r_dir)
+        output_layout.addWidget(_form_label("Blacklist", output_section))
+        output_layout.addWidget(bl_edit)
+        l.addWidget(output_section)
+
+        filters_section, filters_layout = _section("Unpack Date Filters")
+        filters_grid = QGridLayout()
+        filters_grid.setContentsMargins(0, 0, 0, 0)
+        filters_grid.setHorizontalSpacing(8)
+        filters_grid.setVerticalSpacing(8)
+        filters_grid.setColumnStretch(0, 1)
+        filters_grid.addWidget(cb_min_age, 0, 0)
+        filters_grid.addWidget(sp_min_age, 0, 1)
+        filters_grid.addWidget(QLabel("months", filters_section), 0, 2)
+        filters_grid.addWidget(cb_max_age, 1, 0)
+        filters_grid.addWidget(sp_max_age, 1, 1)
+        filters_grid.addWidget(QLabel("months", filters_section), 1, 2)
+        filters_layout.addLayout(filters_grid)
+        l.addWidget(filters_section)
+
+        r_btn = QHBoxLayout()
+        r_btn.addStretch(1)
+        r_btn.addWidget(btn_save)
+        l.addLayout(r_btn)
 
         dlg.exec()
 
