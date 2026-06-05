@@ -490,6 +490,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     COLORIZED_KEY = "ui/colorized_output"
     SHOW_ALL_KEY = "ui/show_all_items"
     ALERTS_ENABLED_KEY = "ui/alerts_enabled"
+    CORNER_ROUNDNESS_KEY = "ui/corner_roundness"
 
     BULK_UNPACK_KEY_ENABLE = "bulk/unpack_filter_enabled"
     BULK_UNPACK_KEY_EXTRA  = "bulk/unpack_extra_months"
@@ -698,6 +699,16 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
     def _set_life_basis(self, v: str):
         QSettings().setValue(self.LIFE_BASIS_KEY, (v or "page").lower())
+
+    def _get_corner_roundness(self) -> int:
+        try:
+            v = int(QSettings().value(self.CORNER_ROUNDNESS_KEY, 50, int))
+        except (TypeError, ValueError):
+            v = 50
+        return max(0, min(100, v))
+
+    def _set_corner_roundness(self, value: int):
+        QSettings().setValue(self.CORNER_ROUNDNESS_KEY, max(0, min(100, int(value))))
 
     def _load_id_history(self):
         h = QSettings().value(self.HISTORY_KEY, [], list)
@@ -1124,7 +1135,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     @safe_slot
     def _open_appearance_dialog(self, *args):
         dlg = FramelessDialog(self, "Appearance", self._icon_dir)
-        lbl = QLabel("Choose the application color theme.", dlg)
+        lbl = QLabel("Choose the application color theme and corner roundness.", dlg)
         lbl.setObjectName("DialogLabel")
 
         btn_theme = QPushButton(dlg)
@@ -1145,11 +1156,41 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             manager.toggle()
             _sync_theme_button()
 
+        corner_label = QLabel("Corner Roundness", dlg)
+        corner_label.setObjectName("DialogLabel")
+
+        corner_slider = QSlider(Qt.Orientation.Horizontal, dlg)
+        corner_slider.setObjectName("ThresholdSlider")
+        corner_slider.setRange(0, 100)
+        corner_slider.setTickInterval(10)
+
+        corner_box = QSpinBox(dlg)
+        corner_box.setObjectName("DialogInput")
+        corner_box.setRange(0, 100)
+        corner_box.setSuffix("%")
+
+        corner_slider.setValue(self._get_corner_roundness())
+        corner_box.setValue(self._get_corner_roundness())
+
+        def _apply_corner_roundness(value: int):
+            self._set_corner_roundness(value)
+            manager = getattr(self, "theme_manager", None)
+            if manager is not None:
+                manager.reapply()
+
         btn_theme.clicked.connect(lambda _checked=False: _toggle_theme())
+        corner_slider.valueChanged.connect(lambda v: corner_box.setValue(int(v)))
+        corner_box.valueChanged.connect(lambda v: corner_slider.setValue(int(v)))
+        corner_slider.valueChanged.connect(_apply_corner_roundness)
         _sync_theme_button()
 
         dlg._content_layout.addWidget(lbl)
         dlg._content_layout.addWidget(btn_theme)
+        dlg._content_layout.addWidget(corner_label)
+        row_roundness = QHBoxLayout()
+        row_roundness.addWidget(corner_slider, 1)
+        row_roundness.addWidget(corner_box)
+        dlg._content_layout.addLayout(row_roundness)
         row = QHBoxLayout()
         row.addStretch(1)
         dlg._content_layout.addLayout(row)

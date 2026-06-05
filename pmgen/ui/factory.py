@@ -165,11 +165,11 @@ class UIFactory:
         h.addStretch(1)
 
         window._thr_label = QLabel("", bar)
-        window._thr_label.setObjectName("DialogLabel")
+        window._thr_label.setObjectName("ThresholdBadge")
         window._thr_label.setProperty("class", "status-chip")
         
         window._basis_label = QLabel("", bar)
-        window._basis_label.setObjectName("DialogLabel")
+        window._basis_label.setObjectName("BasisBadge")
         window._basis_label.setProperty("class", "status-chip")
         
         window._update_threshold_label()

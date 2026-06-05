@@ -116,6 +116,37 @@ RADIUS_LG = 8
 RADIUS_XL = 12
 RADIUS_FULL = 9999
 
+CORNER_ROUNDNESS_KEY = "ui/corner_roundness"
+CORNER_ROUNDNESS_DEFAULT = 50
+CORNER_ROUNDNESS_MIN = 0
+CORNER_ROUNDNESS_MAX = 100
+
+
+def _clamp_corner_strength(value: int) -> int:
+    return max(CORNER_ROUNDNESS_MIN, min(CORNER_ROUNDNESS_MAX, int(value)))
+
+
+def _corner_scale(value: int) -> float:
+    strength = _clamp_corner_strength(value)
+    # 50 preserves the existing radius tokens; 100 doubles them.
+    return strength / 50.0
+
+
+def _scaled_radius(base: int, scale: float) -> int:
+    if base <= 0 or scale <= 0.0:
+        return 0
+    return max(1, int(round(base * scale)))
+
+
+def _badge_radius(scale: float) -> int:
+    # Qt can render tiny badges as square when radius grows too large for height.
+    return min(_scaled_radius(RADIUS_LG, scale), 10)
+
+
+def _popup_radius(scale: float) -> int:
+    # Keep popups clearly rounded, but avoid oversized corners that look distorted.
+    return min(_scaled_radius(RADIUS_DEFAULT, scale), 10)
+
 OUTPUT_HIGHLIGHT_COLORS = {
     "normal": COLOR_ON_PRIMARY,
     "muted": DARK_ON_SURFACE_VARIANT,
@@ -169,6 +200,12 @@ def _qss(
     combo_arrow: Path,
     spin_up_arrow: Path,
     spin_down_arrow: Path,
+    radius_sm: int,
+    radius_default: int,
+    radius_lg: int,
+    radius_popup: int,
+    radius_badge: int,
+    radius_full: int,
 ) -> str:
     combo_arrow_url = combo_arrow.as_posix()
     spin_up_arrow_url = spin_up_arrow.as_posix()
@@ -184,11 +221,11 @@ QMainWindow, QDialog, QWidget {{
 QLabel {{ color: {text}; background: transparent; }}
 QLabel[class="muted"], QLabel#DialogLabel {{ color: {muted}; }}
 QLabel[class="success-label"] {{ color: {COLOR_SUCCESS}; font-weight: 700; }}
-QLabel[class="status-chip"] {{
+QLabel[class="status-chip"], QLabel#ThresholdBadge, QLabel#BasisBadge {{
     color: {muted};
     background: {surface_high};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_FULL}px;
+    border-radius: {radius_badge}px;
     padding: {SPACING_XS}px {SPACING_SM}px;
     font-size: {TYPO_LABEL_SM[0]}px;
     font-weight: {TYPO_LABEL_SM[1]};
@@ -203,7 +240,7 @@ QLabel[class="warning-banner"] {{
     color: {COLOR_WARNING};
     background: {COLOR_WARNING_BG};
     border: 1px solid {COLOR_WARNING};
-    border-radius: {RADIUS_LG}px;
+    border-radius: {radius_lg}px;
     padding: {SPACING_SM}px {SPACING_MD}px;
 }}
 
@@ -231,7 +268,7 @@ QToolButton {{
     background: transparent;
     color: {text};
     padding: {SPACING_SM}px {SPACING_MD}px;
-    border-radius: {RADIUS_DEFAULT}px;
+    border-radius: {radius_default}px;
 }}
 QToolButton:hover {{ background-color: {surface_high}; }}
 QToolButton#SettingsBtn, QToolButton#BulkBtn {{
@@ -247,14 +284,24 @@ QMenu {{
     background: {surface};
     color: {text};
     border: 1px solid {border};
-    border-radius: {RADIUS_DEFAULT}px;
+    border-radius: {radius_popup}px;
+    padding: 4px;
 }}
-QMenu::item {{ padding: {SPACING_SM}px {SPACING_LG}px; }}
+QMenu::item {{
+    padding: {SPACING_SM}px {SPACING_LG}px;
+    border-radius: {radius_sm}px;
+    margin: 1px 2px;
+}}
 QMenu::item:selected {{ background: {surface_high}; }}
+QMenu::separator {{
+    height: 1px;
+    background: {subtle_border};
+    margin: 4px 8px;
+}}
 
 QPushButton {{
     padding: {SPACING_SM}px {SPACING_MD}px;
-    border-radius: {RADIUS_DEFAULT}px;
+    border-radius: {radius_default}px;
     border: 1px solid {subtle_border};
     background: {surface_low};
     color: {text};
@@ -289,7 +336,7 @@ QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox, QList
     background: {surface_low};
     color: {text};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_SM}px;
+    border-radius: {radius_sm}px;
     selection-background-color: {primary};
     selection-color: {primary_text};
     padding: {SPACING_SM}px;
@@ -318,7 +365,7 @@ QSpinBox::up-button, QDoubleSpinBox::up-button {{
     width: 24px;
     border-left: 1px solid {subtle_border};
     border-bottom: 1px solid {subtle_border};
-    border-top-right-radius: {RADIUS_SM}px;
+    border-top-right-radius: {radius_sm}px;
     background: transparent;
 }}
 QSpinBox::down-button, QDoubleSpinBox::down-button {{
@@ -326,7 +373,7 @@ QSpinBox::down-button, QDoubleSpinBox::down-button {{
     subcontrol-position: bottom right;
     width: 24px;
     border-left: 1px solid {subtle_border};
-    border-bottom-right-radius: {RADIUS_SM}px;
+    border-bottom-right-radius: {radius_sm}px;
     background: transparent;
 }}
 QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
@@ -347,16 +394,23 @@ QComboBox QAbstractItemView, #IdCompleterPopup {{
     background: {surface};
     color: {text};
     border: 1px solid {border};
+    border-radius: {radius_popup}px;
+    padding: 2px;
     outline: 0;
     selection-background-color: {primary};
     selection-color: {primary_text};
+}}
+QComboBox QAbstractItemView::item, #IdCompleterPopup::item {{
+    margin: 1px 2px;
+    border-radius: {radius_sm}px;
+    padding: {SPACING_SM}px {SPACING_MD}px;
 }}
 QCheckBox {{ color: {text}; spacing: {SPACING_SM}px; }}
 QCheckBox::indicator {{
     width: 16px;
     height: 16px;
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_SM}px;
+    border-radius: {radius_sm}px;
     background: {surface_low};
 }}
 QCheckBox::indicator:checked {{ background: {primary}; border-color: {primary}; }}
@@ -364,7 +418,7 @@ QSlider#ThresholdSlider::groove:horizontal {{
     border: 1px solid {subtle_border};
     background: {surface_high};
     height: 8px;
-    border-radius: {RADIUS_SM}px;
+    border-radius: {radius_sm}px;
 }}
 QSlider#ThresholdSlider::handle:horizontal {{
     background: {primary};
@@ -372,7 +426,7 @@ QSlider#ThresholdSlider::handle:horizontal {{
     width: 16px;
     height: 16px;
     margin: -5px 0;
-    border-radius: {RADIUS_FULL}px;
+    border-radius: {radius_full}px;
 }}
 QSlider#ThresholdSlider::sub-page:horizontal {{ background: {primary}; }}
 
@@ -381,17 +435,17 @@ QProgressBar#ProgressBar {{
     background: {surface_high};
     color: {text};
     text-align: center;
-    border-radius: {RADIUS_FULL}px;
+    border-radius: {radius_full}px;
 }}
 QProgressBar#ProgressBar::chunk {{
     background-color: {primary};
-    border-radius: {RADIUS_FULL}px;
+    border-radius: {radius_full}px;
 }}
 
 QTabWidget::pane {{
     border: 1px solid {subtle_border};
     background: {bg};
-    border-radius: {RADIUS_LG}px;
+    border-radius: {radius_lg}px;
     margin-top: -1px;
 }}
 QTabWidget::tab-bar {{ alignment: left; }}
@@ -401,8 +455,8 @@ QTabBar::tab {{
     padding: {SPACING_SM}px {SPACING_LG}px;
     border: 1px solid {subtle_border};
     border-bottom: none;
-    border-top-left-radius: {RADIUS_DEFAULT}px;
-    border-top-right-radius: {RADIUS_DEFAULT}px;
+    border-top-left-radius: {radius_default}px;
+    border-top-right-radius: {radius_default}px;
     margin-right: {SPACING_XS}px;
     font-weight: 600;
 }}
@@ -416,7 +470,7 @@ QTableView, QTableWidget {{
     background-color: {surface_low};
     color: {text};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_LG}px;
+    border-radius: {radius_lg}px;
     gridline-color: {subtle_border};
     selection-background-color: {primary};
     selection-color: {primary_text};
@@ -445,7 +499,7 @@ QScrollBar:vertical {{
 QScrollBar::handle:vertical {{
     background: {border};
     min-height: 20px;
-    border-radius: {RADIUS_DEFAULT}px;
+    border-radius: {radius_default}px;
     margin: 2px;
 }}
 QScrollBar::handle:vertical:hover {{ background: {primary}; }}
@@ -455,14 +509,14 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none
 #SecondaryBar {{
     background: {surface_low};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_LG}px;
+    border-radius: {radius_lg}px;
     padding: {SPACING_LG}px;
 }}
 #MainEditor {{
     background: {surface_low};
     color: {text};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_LG}px;
+    border-radius: {radius_lg}px;
     font-family: Consolas, "Fira Code", monospace;
     font-size: {TYPO_BODY_SM[0]}px;
 }}
@@ -471,7 +525,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none
     background: {surface_low};
     color: {text};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_SM}px;
+    border-radius: {radius_sm}px;
     padding: {SPACING_SM}px {SPACING_MD}px;
     font-weight: 700;
 }}
@@ -480,7 +534,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none
     background: {surface_low};
     color: {text};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_SM}px;
+    border-radius: {radius_sm}px;
     padding: {SPACING_SM}px {SPACING_MD}px;
     font-size: {TYPO_BODY_SM[0]}px;
 }}
@@ -488,26 +542,34 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none
 #BulkRunHeader, #InventoryToolbar, #Card, QWidget[class="card"] {{
     background: {surface_low};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_LG}px;
+    border-radius: {radius_lg}px;
 }}
 
 QDialog#FramelessDialogRoot {{
+    background: transparent;
+    border: none;
+}}
+#FramelessDialogFrame {{
     background: {surface};
     border: 1px solid {border};
-    border-radius: {RADIUS_LG}px;
+    border-radius: {radius_lg}px;
 }}
 #DialogTitleBar {{
     background: {surface};
-    border-top-left-radius: {RADIUS_LG}px;
-    border-top-right-radius: {RADIUS_LG}px;
+    border-top-left-radius: {radius_lg}px;
+    border-top-right-radius: {radius_lg}px;
+}}
+#DialogTitleBar #DialogBtnGroup {{
+    background: transparent;
+    border: none;
 }}
 #DialogContent {{
     background: {surface};
     border-left: 1px solid {border};
     border-right: 1px solid {border};
     border-bottom: 1px solid {border};
-    border-bottom-left-radius: {RADIUS_LG}px;
-    border-bottom-right-radius: {RADIUS_LG}px;
+    border-bottom-left-radius: {radius_lg}px;
+    border-bottom-right-radius: {radius_lg}px;
 }}
 #DialogTitleLabel {{
     color: {text};
@@ -516,7 +578,7 @@ QDialog#FramelessDialogRoot {{
 #DialogSection {{
     background: {surface_low};
     border: 1px solid {subtle_border};
-    border-radius: {RADIUS_LG}px;
+    border-radius: {radius_lg}px;
 }}
 #DialogSectionTitle {{
     color: {text};
@@ -527,7 +589,23 @@ QDialog#FramelessDialogRoot {{
 }}
 #DialogBtn {{
     padding: {SPACING_XS}px;
-    border-radius: {RADIUS_DEFAULT}px;
+    border-radius: {radius_default}px;
+}}
+#DialogTitleBar QToolButton#DialogBtn {{
+    min-width: 30px;
+    min-height: 30px;
+    max-width: 30px;
+    max-height: 30px;
+    padding: 0px;
+    border: none;
+    border-radius: {radius_default}px;
+    background: transparent;
+}}
+#DialogTitleBar QToolButton#DialogBtn:hover {{
+    background: {surface_high};
+}}
+#DialogTitleBar QToolButton#DialogBtn:pressed {{
+    background: {surface_low};
 }}
 #TopBarControls QToolButton#DialogBtn {{
     min-width: 36px;
@@ -556,43 +634,76 @@ QDialog#FramelessDialogRoot {{
 """
 
 
-LIGHT_QSS = _qss(
-    bg=COLOR_BACKGROUND,
-    surface=COLOR_SURFACE_LOWEST,
-    surface_low=COLOR_SURFACE_LOWEST,
-    surface_high=COLOR_SURFACE_HIGH,
-    text=COLOR_ON_SURFACE,
-    muted=COLOR_ON_SURFACE_VARIANT,
-    border=COLOR_OUTLINE,
-    subtle_border=COLOR_OUTLINE_VARIANT,
-    primary=COLOR_PRIMARY,
-    primary_text=COLOR_ON_PRIMARY,
-    primary_hover=COLOR_PRIMARY_CONTAINER,
-    danger=COLOR_DANGER,
-    danger_bg=COLOR_DANGER_BG,
-    combo_arrow=_COMBO_DOWN_LIGHT,
-    spin_up_arrow=_SPIN_UP_LIGHT,
-    spin_down_arrow=_SPIN_DOWN_LIGHT,
-)
+def _radii_for_strength(corner_strength: int) -> tuple[int, int, int, int, int, int]:
+    scale = _corner_scale(corner_strength)
+    return (
+        _scaled_radius(RADIUS_SM, scale),
+        _scaled_radius(RADIUS_DEFAULT, scale),
+        _scaled_radius(RADIUS_LG, scale),
+        _popup_radius(scale),
+        _badge_radius(scale),
+        RADIUS_FULL,
+    )
 
-DARK_QSS = _qss(
-    bg=DARK_BACKGROUND,
-    surface=DARK_SURFACE,
-    surface_low=DARK_SURFACE_CONTAINER,
-    surface_high=DARK_SURFACE_HIGH,
-    text=DARK_ON_SURFACE,
-    muted=DARK_ON_SURFACE_VARIANT,
-    border=DARK_BORDER,
-    subtle_border=DARK_OUTLINE,
-    primary=DARK_PRIMARY_CONTAINER,
-    primary_text=COLOR_ON_PRIMARY,
-    primary_hover=COLOR_PRIMARY_CONTAINER,
-    danger=COLOR_DANGER,
-    danger_bg=DARK_SURFACE_HIGH,
-    combo_arrow=_COMBO_DOWN_DARK,
-    spin_up_arrow=_SPIN_UP_DARK,
-    spin_down_arrow=_SPIN_DOWN_DARK,
-)
+
+def _build_light_qss(corner_strength: int) -> str:
+    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full = _radii_for_strength(corner_strength)
+    return _qss(
+        bg=COLOR_BACKGROUND,
+        surface=COLOR_SURFACE_LOWEST,
+        surface_low=COLOR_SURFACE_LOWEST,
+        surface_high=COLOR_SURFACE_HIGH,
+        text=COLOR_ON_SURFACE,
+        muted=COLOR_ON_SURFACE_VARIANT,
+        border=COLOR_OUTLINE,
+        subtle_border=COLOR_OUTLINE_VARIANT,
+        primary=COLOR_PRIMARY,
+        primary_text=COLOR_ON_PRIMARY,
+        primary_hover=COLOR_PRIMARY_CONTAINER,
+        danger=COLOR_DANGER,
+        danger_bg=COLOR_DANGER_BG,
+        combo_arrow=_COMBO_DOWN_LIGHT,
+        spin_up_arrow=_SPIN_UP_LIGHT,
+        spin_down_arrow=_SPIN_DOWN_LIGHT,
+        radius_sm=radius_sm,
+        radius_default=radius_default,
+        radius_lg=radius_lg,
+        radius_popup=radius_popup,
+        radius_badge=radius_badge,
+        radius_full=radius_full,
+    )
+
+
+def _build_dark_qss(corner_strength: int) -> str:
+    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full = _radii_for_strength(corner_strength)
+    return _qss(
+        bg=DARK_BACKGROUND,
+        surface=DARK_SURFACE,
+        surface_low=DARK_SURFACE_CONTAINER,
+        surface_high=DARK_SURFACE_HIGH,
+        text=DARK_ON_SURFACE,
+        muted=DARK_ON_SURFACE_VARIANT,
+        border=DARK_BORDER,
+        subtle_border=DARK_OUTLINE,
+        primary=DARK_PRIMARY_CONTAINER,
+        primary_text=COLOR_ON_PRIMARY,
+        primary_hover=COLOR_PRIMARY_CONTAINER,
+        danger=COLOR_DANGER,
+        danger_bg=DARK_SURFACE_HIGH,
+        combo_arrow=_COMBO_DOWN_DARK,
+        spin_up_arrow=_SPIN_UP_DARK,
+        spin_down_arrow=_SPIN_DOWN_DARK,
+        radius_sm=radius_sm,
+        radius_default=radius_default,
+        radius_lg=radius_lg,
+        radius_popup=radius_popup,
+        radius_badge=radius_badge,
+        radius_full=radius_full,
+    )
+
+
+LIGHT_QSS = _build_light_qss(CORNER_ROUNDNESS_DEFAULT)
+DARK_QSS = _build_dark_qss(CORNER_ROUNDNESS_DEFAULT)
 
 GLOBAL_STYLE_DARK = DARK_QSS
 
@@ -611,21 +722,40 @@ class ThemeManager(QObject):
         if mode in {"dark", "light"}:
             QSettings().setValue("ui/theme_mode", mode)
 
-    def apply_light(self) -> None:
-        self._app.setStyle("Fusion")
-        self._app.setStyleSheet(LIGHT_QSS)
-        self._is_dark = False
-        self._app.setProperty("pmgenThemeMode", "light")
-        refresh_themed_icons(self._app, self._is_dark)
-        self.save_mode("light")
+    def _get_corner_strength(self) -> int:
+        try:
+            value = int(QSettings().value(CORNER_ROUNDNESS_KEY, CORNER_ROUNDNESS_DEFAULT, int))
+        except (TypeError, ValueError):
+            value = CORNER_ROUNDNESS_DEFAULT
+        return _clamp_corner_strength(value)
 
-    def apply_dark(self) -> None:
+    def _apply_mode(self, mode: str, *, save: bool) -> None:
+        corner_strength = self._get_corner_strength()
         self._app.setStyle("Fusion")
-        self._app.setStyleSheet(DARK_QSS)
+        if mode == "light":
+            self._app.setStyleSheet(_build_light_qss(corner_strength))
+            self._is_dark = False
+            self._app.setProperty("pmgenThemeMode", "light")
+            refresh_themed_icons(self._app, self._is_dark)
+            if save:
+                self.save_mode("light")
+            return
+
+        self._app.setStyleSheet(_build_dark_qss(corner_strength))
         self._is_dark = True
         self._app.setProperty("pmgenThemeMode", "dark")
         refresh_themed_icons(self._app, self._is_dark)
-        self.save_mode("dark")
+        if save:
+            self.save_mode("dark")
+
+    def apply_light(self) -> None:
+        self._apply_mode("light", save=True)
+
+    def apply_dark(self) -> None:
+        self._apply_mode("dark", save=True)
+
+    def reapply(self) -> None:
+        self._apply_mode("dark" if self._is_dark else "light", save=False)
 
     def toggle(self) -> None:
         if self._is_dark:
@@ -635,10 +765,7 @@ class ThemeManager(QObject):
 
     def apply_saved(self) -> None:
         mode = QSettings().value("ui/theme_mode", "dark", str)
-        if mode == "light":
-            self.apply_light()
-        else:
-            self.apply_dark()
+        self._apply_mode("light" if mode == "light" else "dark", save=False)
 
 
 def apply_static_theme(app: QApplication) -> ThemeManager:

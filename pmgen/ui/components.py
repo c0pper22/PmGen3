@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from PyQt6.QtCore import Qt, QPoint, QRect
+from PyQt6.QtCore import Qt, QPoint, QRect, QSize
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QWidget, QMainWindow, QLabel, QDialog, QHBoxLayout, 
@@ -106,6 +106,8 @@ class DialogTitleBar(QWidget):
         lbl.setObjectName("DialogTitleLabel")
 
         btn_min = QToolButton(self); btn_min.setObjectName("DialogBtn")
+        btn_min.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        btn_min.setIconSize(QSize(14, 14))
         set_themed_icon(btn_min, "minimize", icon_dir); btn_min.setToolTip("Minimize")
         btn_min.clicked.connect(self._win.showMinimized)
 
@@ -114,9 +116,13 @@ class DialogTitleBar(QWidget):
         self._act_max.setCheckable(True)
         self._act_max.triggered.connect(self._toggle_max_restore)
         btn_max = QToolButton(self); btn_max.setObjectName("DialogBtn")
+        btn_max.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        btn_max.setIconSize(QSize(14, 14))
         btn_max.setDefaultAction(self._act_max)
 
         btn_close = QToolButton(self); btn_close.setObjectName("DialogBtn")
+        btn_close.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        btn_close.setIconSize(QSize(14, 14))
         set_themed_icon(btn_close, "exit", icon_dir); btn_close.setToolTip("Close")
         btn_close.clicked.connect(self._win.close)
 
@@ -124,7 +130,9 @@ class DialogTitleBar(QWidget):
         right = QHBoxLayout()
         right.setContentsMargins(0, 0, 0, 0)
         right.setSpacing(0)
-        box = QWidget(self); box.setLayout(right)
+        box = QWidget(self)
+        box.setObjectName("DialogBtnGroup")
+        box.setLayout(right)
         right.addWidget(btn_min); right.addWidget(btn_max); right.addWidget(btn_close)
         layout.addWidget(box, 0)
         self.setFixedHeight(36)
@@ -159,21 +167,34 @@ class FramelessDialog(QDialog):
         super().__init__(parent, flags=Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
         self.setObjectName("FramelessDialogRoot")
         self.setModal(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setContentsMargins(1, 1, 1, 1)
         outer.setSpacing(0)
+
+        self._frame = QWidget(self)
+        self._frame.setObjectName("FramelessDialogFrame")
+        outer.addWidget(self._frame)
+
+        frame_layout = QVBoxLayout(self._frame)
+        frame_layout.setContentsMargins(0, 0, 0, 0)
+        frame_layout.setSpacing(0)
+
         self._titlebar = DialogTitleBar(self, title, icon_dir)
-        outer.addWidget(self._titlebar)
-        sep = QFrame(self)
+        frame_layout.addWidget(self._titlebar)
+
+        sep = QFrame(self._frame)
         sep.setObjectName("DialogSeparator")
         sep.setFrameShape(QFrame.Shape.NoFrame)
-        outer.addWidget(sep)
-        self._content = QWidget(self)
+        frame_layout.addWidget(sep)
+
+        self._content = QWidget(self._frame)
         self._content.setObjectName("DialogContent")
         self._content_layout = QVBoxLayout(self._content)
         self._content_layout.setContentsMargins(12, 12, 12, 12)
         self._content_layout.setSpacing(12)
-        outer.addWidget(self._content)
+        frame_layout.addWidget(self._content)
         self.setMinimumSize(420, 220)
 
 # ---------------------------- CustomMessageBox ----------------------------
