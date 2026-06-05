@@ -1122,6 +1122,40 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         dlg.exec()
 
     @safe_slot
+    def _open_appearance_dialog(self, *args):
+        dlg = FramelessDialog(self, "Appearance", self._icon_dir)
+        lbl = QLabel("Choose the application color theme.", dlg)
+        lbl.setObjectName("DialogLabel")
+
+        btn_theme = QPushButton(dlg)
+        btn_theme.setObjectName("ThemeToggleButton")
+        btn_theme.setProperty("class", "primary")
+        btn_theme.setCheckable(True)
+
+        def _sync_theme_button():
+            manager = getattr(self, "theme_manager", None)
+            is_dark = bool(getattr(manager, "is_dark", True))
+            btn_theme.setChecked(is_dark)
+            btn_theme.setText("Switch to Light Mode" if is_dark else "Switch to Dark Mode")
+
+        def _toggle_theme():
+            manager = getattr(self, "theme_manager", None)
+            if manager is None:
+                return
+            manager.toggle()
+            _sync_theme_button()
+
+        btn_theme.clicked.connect(lambda _checked=False: _toggle_theme())
+        _sync_theme_button()
+
+        dlg._content_layout.addWidget(lbl)
+        dlg._content_layout.addWidget(btn_theme)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        dlg._content_layout.addLayout(row)
+        dlg.exec()
+
+    @safe_slot
     def _open_bulk_settings(self, *args):
         cfg = self._get_bulk_config()
         s = QSettings()

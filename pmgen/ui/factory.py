@@ -83,9 +83,9 @@ class UIFactory:
         act_color.toggled.connect(lambda c: (window._set_colorized(c), window._apply_colorized_highlighter()))
         settings_menu.addAction(act_color)
 
-        act_theme = QAction("Theme", window)
-        act_theme.triggered.connect(lambda: getattr(window, "theme_manager", None) and window.theme_manager.toggle())
-        settings_menu.addAction(act_theme)
+        act_appearance = QAction("Appearance", window)
+        act_appearance.triggered.connect(window._open_appearance_dialog)
+        settings_menu.addAction(act_appearance)
         
         act_clear = QAction("Clear Output Window", window)
         act_clear.triggered.connect(window._clear_output_window)

@@ -351,6 +351,49 @@ def test_show_about_db_failure_shows_zero(mock_main_window, monkeypatch):
     assert "Supported models: 0" in txt
 
 
+def test_open_appearance_dialog_toggles_theme_and_updates_button(mock_main_window, monkeypatch):
+    window = mock_main_window
+
+    class ThemeManagerProbe:
+        def __init__(self):
+            self.is_dark = True
+
+        def toggle(self):
+            self.is_dark = not self.is_dark
+
+    class DialogProbe(QWidget):
+        instances = []
+
+        def __init__(self, parent=None, *args, **kwargs):
+            super().__init__(parent)
+            self._content_layout = QVBoxLayout(self)
+            self.executed = False
+            DialogProbe.instances.append(self)
+
+        def exec(self):
+            self.executed = True
+            return 0
+
+        def accept(self):
+            pass
+
+    window.theme_manager = ThemeManagerProbe()
+    monkeypatch.setattr("pmgen.ui.main_window.FramelessDialog", DialogProbe)
+
+    window._open_appearance_dialog()
+
+    dlg = DialogProbe.instances[-1]
+    theme_button = dlg.findChild(QPushButton, "ThemeToggleButton")
+
+    assert dlg.executed is True
+    assert theme_button.text() == "Switch to Light Mode"
+
+    theme_button.click()
+
+    assert window.theme_manager.is_dark is False
+    assert theme_button.text() == "Switch to Dark Mode"
+
+
 def test_open_catalog_editor_reuses_single_window(mock_main_window, monkeypatch):
     """Catalog editor window should be reused instead of recreated on repeated opens."""
     window = mock_main_window
