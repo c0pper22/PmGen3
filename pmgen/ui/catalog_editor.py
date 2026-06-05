@@ -5,8 +5,7 @@ import re
 import string
 from typing import Dict, List, Optional, Set, Tuple
 
-from PyQt6.QtCore import QPoint, QRect, QEvent, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QCursor, QIcon
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -22,7 +21,6 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -32,10 +30,9 @@ from pmgen.canon.regex_tokens import BUILTIN_REGEX_TOKENS, expand_regex_tokens
 from pmgen.io.db_access import CatalogDB
 from pmgen.rules.grouping import UnitGroupingRule
 from pmgen.rules.kit_link import KitLinkRule
-from pmgen.ui.components import CustomMessageBox, DragRegion, ResizeState, TitleDragLabel
-
-
-BORDER_WIDTH = 8
+from pmgen.ui.components import CustomMessageBox, ResizeState
+from pmgen.ui.shell import WindowControlSpec, WindowResizeMixin, build_frameless_top_bar
+from pmgen.ui.theme import SPACING_LG, SPACING_MD
 
 
 class _EditorTabBase(QWidget):
@@ -1114,7 +1111,7 @@ class QtyOverridesTab(_EditorTabBase):
             CustomMessageBox.warn(self, "Save Failed", str(ex), self._icon_dir)
 
 
-class CatalogEditorWindow(QMainWindow):
+class CatalogEditorWindow(WindowResizeMixin, QMainWindow):
     def __init__(self, icon_dir: str, parent=None):
         super().__init__(parent)
         self._icon_dir = icon_dir
@@ -1132,55 +1129,34 @@ class CatalogEditorWindow(QMainWindow):
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
-        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setContentsMargins(SPACING_LG, SPACING_LG, SPACING_LG, SPACING_LG)
         layout.setSpacing(0)
 
-        top_bar = QWidget(self)
-        top_bar.setObjectName("TopBarBg")
-        top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(BORDER_WIDTH, BORDER_WIDTH, BORDER_WIDTH, 0)
-        top_layout.setSpacing(0)
-
-        title = TitleDragLabel("Catalog Editor", self)
-        drag_right = DragRegion(self)
-
-        btn_min = QToolButton(top_bar)
-        btn_min.setDefaultAction(QAction(QIcon(os.path.join(self._icon_dir, "minimize.svg")), "Min", self, triggered=self.showMinimized))
-
-        self._act_full = QAction(QIcon(os.path.join(self._icon_dir, "fullscreen.svg")), "Full", self)
-        self._act_full.setCheckable(True)
-        self._act_full.triggered.connect(self._toggle_fullscreen)
-        btn_full = QToolButton(top_bar)
-        btn_full.setDefaultAction(self._act_full)
-
-        btn_exit = QToolButton(top_bar)
-        btn_exit.setDefaultAction(QAction(QIcon(os.path.join(self._icon_dir, "exit.svg")), "Exit", self, triggered=self._confirm_close))
-
-        right_box = QWidget(top_bar)
-        right_l = QHBoxLayout(right_box)
-        right_l.setContentsMargins(0, 0, 0, 0)
-        right_l.setSpacing(0)
-        right_l.addWidget(btn_min)
-        right_l.addWidget(btn_full)
-        right_l.addWidget(btn_exit)
-
-        top_layout.addWidget(DragRegion(self), 1)
-        top_layout.addWidget(title, 0)
-        top_layout.addWidget(drag_right, 1)
-        top_layout.addWidget(right_box, 0)
+        top_bar = build_frameless_top_bar(
+            self,
+            WindowControlSpec(
+                title="Catalog Editor",
+                icon_dir=self._icon_dir,
+                on_minimize=self.showMinimized,
+                on_toggle_fullscreen=self._toggle_fullscreen,
+                on_close=self._confirm_close,
+            ),
+        )
         layout.addWidget(top_bar, 0)
 
         content = QWidget(self)
         content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(8, 8, 8, 8)
-        content_layout.setSpacing(6)
+        content_layout.setContentsMargins(SPACING_LG, SPACING_LG, SPACING_LG, SPACING_LG)
+        content_layout.setSpacing(SPACING_MD)
 
         header_row = QHBoxLayout()
         self.header = QLabel("Edit models, PM units, canon mappings, per-color units, and quantity overrides", content)
         self.header.setObjectName("DialogLabel")
+        self.header.setProperty("class", "headline-sm")
         header_row.addWidget(self.header, 1)
 
         self.btn_save_all = QPushButton("Save All", content)
+        self.btn_save_all.setProperty("class", "primary")
         self.btn_save_all.setEnabled(False)
         self.btn_save_all.clicked.connect(self.save_all_changes)
         header_row.addWidget(self.btn_save_all)
@@ -1188,6 +1164,7 @@ class CatalogEditorWindow(QMainWindow):
 
         self.dependency_hint = QLabel("", content)
         self.dependency_hint.setObjectName("DialogLabel")
+        self.dependency_hint.setProperty("class", "warning-banner")
         self.dependency_hint.setWordWrap(True)
         self.dependency_hint.setVisible(False)
         content_layout.addWidget(self.dependency_hint)
@@ -1331,88 +1308,3 @@ class CatalogEditorWindow(QMainWindow):
                 return
         super().closeEvent(event)
 
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.MouseMove:
-            if self.isVisible() and not self.isMaximized() and not self.isFullScreen() and not self._rs.resizing:
-                if obj is self or (isinstance(obj, QWidget) and self.isAncestorOf(obj)):
-                    self._update_cursor(QCursor.pos())
-        return super().eventFilter(obj, event)
-
-    def _edge_flags_at_pos(self, pos_global: QPoint):
-        rect = self.frameGeometry()
-        x, y = pos_global.x(), pos_global.y()
-        return (
-            abs(x - rect.left()) <= BORDER_WIDTH,
-            abs(x - rect.right()) <= BORDER_WIDTH,
-            abs(y - rect.top()) <= BORDER_WIDTH,
-            abs(y - rect.bottom()) <= BORDER_WIDTH,
-        )
-
-    def _update_cursor(self, pos_global: QPoint):
-        if self.isMaximized() or self.isFullScreen() or self._rs.resizing:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-            return
-
-        l, r, t, b = self._edge_flags_at_pos(pos_global)
-        if (l and t) or (r and b):
-            self.setCursor(Qt.CursorShape.SizeFDiagCursor)
-        elif (r and t) or (l and b):
-            self.setCursor(Qt.CursorShape.SizeBDiagCursor)
-        elif l or r:
-            self.setCursor(Qt.CursorShape.SizeHorCursor)
-        elif t or b:
-            self.setCursor(Qt.CursorShape.SizeVerCursor)
-        else:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and not (self.isMaximized() or self.isFullScreen()):
-            l, r, t, b = self._edge_flags_at_pos(event.globalPosition().toPoint())
-            if l or r or t or b:
-                self._rs.resizing = True
-                self._rs.edge_left, self._rs.edge_right = l, r
-                self._rs.edge_top, self._rs.edge_bottom = t, b
-                self._rs.press_pos = event.globalPosition().toPoint()
-                self._rs.press_geom = self.geometry()
-                event.accept()
-                return
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        if self._rs.resizing:
-            delta = event.globalPosition().toPoint() - self._rs.press_pos
-            g = QRect(self._rs.press_geom)
-
-            if self._rs.edge_left:
-                g.setLeft(g.left() + delta.x())
-            if self._rs.edge_right:
-                g.setRight(g.right() + delta.x())
-            if self._rs.edge_top:
-                g.setTop(g.top() + delta.y())
-            if self._rs.edge_bottom:
-                g.setBottom(g.bottom() + delta.y())
-
-            if g.width() >= self.minimumWidth() and g.height() >= self.minimumHeight():
-                self.setGeometry(g)
-            event.accept()
-            return
-
-        self._update_cursor(event.globalPosition().toPoint())
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and self._rs.resizing:
-            self._rs.resizing = False
-            self._update_cursor(event.globalPosition().toPoint())
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
-
-    def enterEvent(self, event):
-        self._update_cursor(QCursor.pos())
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        if not self._rs.resizing:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-        super().leaveEvent(event)

@@ -81,10 +81,11 @@ def main() -> int:
 
         bootstrap_database()
         
-        from pmgen.ui.main_window import MainWindow, apply_static_theme
-        apply_static_theme(app)
+        from pmgen.ui.main_window import MainWindow
+        from pmgen.ui.theme import apply_static_theme
+        theme_manager = apply_static_theme(app)
 
-        win = MainWindow()
+        win = MainWindow(theme_manager=theme_manager)
         win.show()
         
         logging.info("Application loop starting.")

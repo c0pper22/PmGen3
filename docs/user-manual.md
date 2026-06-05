@@ -305,6 +305,7 @@ Open `Settings` from the top toolbar.
 | `Life Basis` | Chooses whether PM life is evaluated primarily by page counters or drive counters. |
 | `Show All Items` | Toggles whether reports include not-due/watch items in addition to due items. |
 | `Colorized Output` | Toggles color highlighting in the Single tab output. |
+| `Theme` | Switches between light and dark mode. Dark mode remains the default startup theme. |
 | `Clear Output Window` | Clears the Single tab output. Same as `Ctrl+L`. |
 | `About` | Shows the PmGen version and supported model count/list. |
 | `Catalog Editor` | Opens the catalog editor for models, PM units, canon mappings, per-color units, and quantity overrides. |

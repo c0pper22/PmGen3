@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import (
 )
 
 from .components import CustomMessageBox
+from .theme import SPACING_MD, SPACING_SM
+from .widgets import configure_table_view, make_card
 
 
 def get_cache_path():
@@ -223,45 +225,49 @@ class InventoryTab(QWidget):
     def __init__(self, parent=None, icon_dir=None):
         super().__init__(parent)
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(8, 8, 8, 8)
-        self._layout.setSpacing(8)
+        self._layout.setContentsMargins(SPACING_MD, SPACING_MD, SPACING_MD, SPACING_MD)
+        self._layout.setSpacing(SPACING_MD)
         self.icon_dir = icon_dir
 
-        # 1. Top Controls Area
-        top_bar = QHBoxLayout()
+        toolbar = make_card(self, "InventoryToolbar")
+        top_bar = QHBoxLayout(toolbar)
+        top_bar.setContentsMargins(SPACING_MD, SPACING_SM, SPACING_MD, SPACING_SM)
+        top_bar.setSpacing(SPACING_SM)
         
         self.btn_load = QPushButton("Import")
+        self.btn_load.setProperty("class", "primary")
         self.btn_load.setToolTip("Import Inventory CSV")
         self.btn_load.setIcon(QIcon.fromTheme("document-open")) 
         self.btn_load.clicked.connect(self._load_csv)
         self.btn_load.setFixedHeight(32)
 
         self.btn_add = QPushButton("Add Item")
+        self.btn_add.setProperty("class", "secondary")
         self.btn_add.setToolTip("Add a new empty row")
         self.btn_add.setIcon(QIcon.fromTheme("list-add"))
         self.btn_add.clicked.connect(self._add_new_row)
         self.btn_add.setFixedHeight(32)
 
         self.btn_delete = QPushButton("Delete")
+        self.btn_delete.setProperty("class", "danger")
         self.btn_delete.setToolTip("Delete selected rows")
         self.btn_delete.setIcon(QIcon.fromTheme("edit-delete"))
         self.btn_delete.clicked.connect(self._delete_selected)
         self.btn_delete.setFixedHeight(32)
         
         self.lbl_status = QLabel("No inventory loaded")
-        self.lbl_status.setStyleSheet("color: #888; font-style: italic;")
+        self.lbl_status.setProperty("class", "muted")
 
         self.lbl_total = QLabel("Total Value: $0.00")
-        self.lbl_total.setStyleSheet("font-weight: bold; color: #4CAF50;")
+        self.lbl_total.setProperty("class", "success-label")
         
         top_bar.addWidget(self.btn_load)
-        top_bar.addWidget(self.btn_add)     # Added here
+        top_bar.addWidget(self.btn_add)
         top_bar.addWidget(self.btn_delete)
         top_bar.addWidget(self.lbl_status)
         top_bar.addStretch(1)
         top_bar.addWidget(self.lbl_total)
 
-        # 2. Table Area
         self.table_view = QTableView()
         self.model = InventoryModel()
         self.table_view.setModel(self.model)
@@ -273,20 +279,15 @@ class InventoryTab(QWidget):
         # Connect model reset (Load new file, Delete rows, Add rows)
         self.model.modelReset.connect(self._recalculate_total_label)
         self.model.modelReset.connect(self._auto_save_to_cache)
-        self.model.rowsInserted.connect(self._auto_save_to_cache) # Save on add
-        
-        # Style the table
-        self.table_view.setAlternatingRowColors(True)
-        self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.table_view.setSelectionMode(QTableView.SelectionMode.ExtendedSelection) # Allow multiple selection
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table_view.verticalHeader().setVisible(False)
-        self.table_view.setShowGrid(False)
+        self.model.rowsInserted.connect(self._auto_save_to_cache)
 
-        self._layout.addLayout(top_bar)
+        configure_table_view(self.table_view, compact=False)
+        self.table_view.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
+        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        self._layout.addWidget(toolbar)
         self._layout.addWidget(self.table_view)
 
-        # 3. Attempt to restore previous session data
         self._load_from_cache()
 
     @safe_slot

@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 # Imports from our new split files
 from pmgen.ui.bulk_model import BulkQueueModel
 from pmgen.system.wrappers import safe_slot
-from .theme import apply_static_theme
+from .theme import SPACING_LG, apply_static_theme
 from .components import (
     DragRegion, TitleDragLabel, FramelessDialog, CustomMessageBox, ResizeState, LoadingDialog
 )
@@ -39,6 +39,8 @@ from pmgen.updater.updater import UpdateWorker, perform_restart, CURRENT_VERSION
 from .inventory import InventoryTab
 from .factory import UIFactory
 from .catalog_editor import CatalogEditorWindow
+from .pages import DashboardTabs, InventoryPage, SingleReportPage
+from .shell import WindowResizeMixin, resolve_icon_dir
 
 
 SERVICE_NAME = "PmGen"
@@ -221,7 +223,7 @@ class BulkRunTab(QWidget):
         top_bar = QHBoxLayout()
         
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("font-weight: bold; color: #bbbbbb;")
+        self.status_label.setProperty("class", "status-chip")
         
         self.progress_bar = QProgressBar()
         self.progress_bar.setObjectName("ProgressBar")
@@ -472,11 +474,15 @@ class BulkRunTab(QWidget):
         self.log_editor.moveCursor(QTextCursor.MoveOperation.End)
 
 
+# Compatibility exports for callers that import these classes from this module.
+from .bulk_run import BulkRunTab, BulkSortFilterProxyModel
+
+
 # =============================================================================
 #  MAIN WINDOW
 # =============================================================================
 
-class MainWindow(QMainWindow):
+class MainWindow(WindowResizeMixin, QMainWindow):
     # ---- PM settings Keys ----
     THRESH_KEY = "pm/due_threshold"
     THRESH_ENABLED_KEY = "pm/due_threshold_enabled"
@@ -499,8 +505,10 @@ class MainWindow(QMainWindow):
 
     customerMap: Dict[str, str] = {}
 
-    def __init__(self):
+    def __init__(self, theme_manager=None):
         super().__init__()
+        self.theme_manager = theme_manager
+        self._rs = ResizeState()
         icon_path = os.path.join(os.path.dirname(__file__), "icons", "pmgen.ico")
         self.setWindowIcon(QIcon(icon_path))
 
@@ -521,12 +529,7 @@ class MainWindow(QMainWindow):
                     except OSError:
                         pass
         
-        # Paths
-        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-            base_dir = sys._MEIPASS
-        else:
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        self._icon_dir = os.path.join(base_dir, "pmgen", "assets", "icons")
+        self._icon_dir = resolve_icon_dir()
 
         # Auth UI state
         self._signed_in: bool = False
@@ -540,55 +543,26 @@ class MainWindow(QMainWindow):
         app.installEventFilter(self)
         self.setMouseTracking(True)
 
-        # --- UI SETUP START ---
         central = QWidget()
         self.setCentralWidget(central)
         central.setMouseTracking(True)
         
-        # Main layout for the window
         self._vbox = QVBoxLayout(central)
-        self._vbox.setContentsMargins(6, 6, 6, 6)
+        self._vbox.setContentsMargins(SPACING_LG, SPACING_LG, SPACING_LG, SPACING_LG)
         self._vbox.setSpacing(0)
 
-        # Initialize the Tab Widget
-        self.tabs = QTabWidget()
-        self.tabs.setObjectName("MainTabs")
-        self.tabs.setDocumentMode(True)
-        self.tabs.setTabsClosable(True) # ENABLE TAB CLOSING
+        self.tabs = DashboardTabs()
         self.tabs.tabCloseRequested.connect(self._on_tab_close_requested)
         self._vbox.addWidget(self.tabs)
 
-        # -- TAB 1: Home (Cleaned up: Just Editor and Bar) --
-        self.tab_home = QWidget()
-        self.tab_home.setObjectName("TabHome")
-        home_layout = QVBoxLayout(self.tab_home)
-        home_layout.setContentsMargins(0, 8, 0, 0)
-        home_layout.setSpacing(6)
-
-        # --- REFACTOR: Use UIFactory ---
         ui_factory = UIFactory(self._icon_dir)
-        self._secondary_bar = ui_factory.create_secondary_bar(self)
-        home_layout.addWidget(self._secondary_bar, 0)
-
-        self.editor = QPlainTextEdit()
-        self.editor.setReadOnly(True)
-        self.editor.setMaximumBlockCount(2000)
+        self.tab_home = SingleReportPage(self, self._icon_dir, self)
         self._apply_colorized_highlighter()
-        self.editor.setObjectName("MainEditor")
-        self.editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        
-        home_layout.addWidget(self.editor, 1)
+        self.tabs.add_pinned_tab(self.tab_home, "Single")
 
-        self.tabs.addTab(self.tab_home, "Single")
-        self.tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
+        self.tab_inventory_page = InventoryPage(self, self._icon_dir, self)
+        self.tabs.add_pinned_tab(self.tab_inventory_page, "Inventory")
 
-        self.tab_tools = InventoryTab(self, icon_dir=self._icon_dir)
-        self.tab_tools.setObjectName("TabInventory")
-        self.tabs.addTab(self.tab_tools, "Inventory")
-
-        self.tabs.tabBar().setTabButton(1, QTabBar.ButtonPosition.RightSide, None)
-
-        # --- REFACTOR: Use UIFactory ---
         self.toolbar = ui_factory.create_toolbar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
 
@@ -606,22 +580,17 @@ class MainWindow(QMainWindow):
         self._update_auth_ui()
         QTimer.singleShot(0, self._attempt_auto_login)
 
-        # --- AUTO CHECK ON STARTUP ---
         QTimer.singleShot(1500, lambda: self._start_update_check(silent=True))
-
-        self._rs = ResizeState()
 
     # =========================================================================
     #  Tab Management
     # =========================================================================
     
     def _on_tab_close_requested(self, index):
-        # Don't allow closing Home (0) or Inventory (1)
-        # Adjust indices if you rearrange tabs.
         widget = self.tabs.widget(index)
         
-        if widget == self.tab_home or widget == self.tab_tools:
-            return # Ignore
+        if widget in {self.tab_home, self.tab_tools, self.tab_inventory_page}:
+            return
             
         if isinstance(widget, BulkRunTab):
             # Check if running
@@ -656,6 +625,8 @@ class MainWindow(QMainWindow):
         return max(0, min(120, v))
 
     def _get_bulk_config(self) -> BulkConfig:
+        if hasattr(self, "_bulk_config_cache"):
+            return self._bulk_config_cache
         s = QSettings()
         top_n = int(s.value(BULK_TOPN_KEY, 25, int))
         out   = s.value(BULK_DIR_KEY, "", str)
@@ -682,6 +653,7 @@ class MainWindow(QMainWindow):
         )
 
     def _save_bulk_config(self, cfg: BulkConfig):
+        self._bulk_config_cache = cfg
         s = QSettings()
         s.setValue(BULK_TOPN_KEY, int(cfg.top_n))
         s.setValue(BULK_DIR_KEY, cfg.out_dir or "")
@@ -691,6 +663,7 @@ class MainWindow(QMainWindow):
         s.setValue("bulk/custom_08_code", cfg.custom_08_code)
         s.setValue("bulk/generate_pdfs", bool(cfg.generate_pdfs))
         s.setValue(BULK_MACHINE_FILTER_KEY, cfg.machine_filter)
+        s.sync()
 
     def _get_show_all(self) -> bool:
         return bool(QSettings().value(self.SHOW_ALL_KEY, False, bool))
@@ -1054,7 +1027,7 @@ class MainWindow(QMainWindow):
         serial = self._upsert_id_history(serial)
         if not serial:
             return
-        self.tabs.setCurrentIndex(0)
+        self.tabs.setCurrentWidget(self.tab_home)
         self._id_combo.setEditText(serial)
         self._on_generate_clicked()
 
@@ -1363,55 +1336,3 @@ class MainWindow(QMainWindow):
                         logging.error(f"Failed to delete inventory cache: {e}")
         super().closeEvent(ev)
 
-    def eventFilter(self, obj, event):
-        if not self.isFullScreen() and event.type() in (QEvent.Type.MouseMove, QEvent.Type.HoverMove, QEvent.Type.Leave):
-            self._update_cursor(QCursor.pos())
-        return super().eventFilter(obj, event)
-
-    def _edge_flags_at_pos(self, pos_global: QPoint):
-        pos = self.mapFromGlobal(pos_global); r = self.rect()
-        return (pos.x() <= BORDER_WIDTH, pos.x() >= r.width() - BORDER_WIDTH, 
-                pos.y() <= BORDER_WIDTH, pos.y() >= r.height() - BORDER_WIDTH)
-
-    def _update_cursor(self, pos_global: QPoint):
-        if self.isFullScreen(): self.unsetCursor(); return
-        left, right, top, bottom = self._edge_flags_at_pos(pos_global)
-        if (left and top) or (right and bottom): self.setCursor(Qt.CursorShape.SizeFDiagCursor)
-        elif (right and top) or (left and bottom): self.setCursor(Qt.CursorShape.SizeBDiagCursor)
-        elif left or right: self.setCursor(Qt.CursorShape.SizeHorCursor)
-        elif top or bottom: self.setCursor(Qt.CursorShape.SizeVerCursor)
-        else: self.setCursor(Qt.CursorShape.ArrowCursor)
-
-    def mousePressEvent(self, e):
-        if e.button() == Qt.MouseButton.LeftButton and not self.isFullScreen():
-            l, r, t, b = self._edge_flags_at_pos(e.globalPosition().toPoint())
-            if any((l, r, t, b)):
-                self._rs = ResizeState(True, l, r, t, b, e.globalPosition().toPoint(), self.geometry())
-                e.accept(); return
-        super().mousePressEvent(e)
-
-    def mouseMoveEvent(self, e):
-        if self._rs.resizing and not self.isFullScreen():
-            delta = e.globalPosition().toPoint() - self._rs.press_pos
-            g = QRect(self._rs.press_geom)
-            if self._rs.edge_left: g.setLeft(min(g.left() + delta.x(), g.right() - 200))
-            elif self._rs.edge_right: g.setRight(max(self._rs.press_geom.right() + delta.x(), g.left() + 200))
-            if self._rs.edge_top: g.setTop(min(g.top() + delta.y(), g.bottom() - 150))
-            elif self._rs.edge_bottom: g.setBottom(max(self._rs.press_geom.bottom() + delta.y(), g.top() + 150))
-            self.setGeometry(g); e.accept(); return
-        
-        if not self.isFullScreen(): self._update_cursor(e.globalPosition().toPoint())
-        super().mouseMoveEvent(e)
-
-    def mouseReleaseEvent(self, e):
-        if e.button() == Qt.MouseButton.LeftButton and self._rs.resizing:
-            self._rs = ResizeState(); self._update_cursor(QCursor.pos()); e.accept(); return
-        super().mouseReleaseEvent(e)
-
-    def enterEvent(self, e):
-        if not self.isFullScreen(): self._update_cursor(QCursor.pos())
-        super().enterEvent(e)
-
-    def leaveEvent(self, e):
-        self.unsetCursor()
-        super().leaveEvent(e)

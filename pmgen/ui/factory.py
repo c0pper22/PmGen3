@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
 
 from pmgen.system.wrappers import safe_slot
 from .components import DragRegion, TitleDragLabel, CustomMessageBox
+from .shell import WindowControlSpec, build_frameless_top_bar
+from .theme import SPACING_MD, SPACING_SM
 from pmgen.updater.updater import CURRENT_VERSION
 
 BORDER_WIDTH = 8
@@ -80,6 +82,10 @@ class UIFactory:
         act_color.setChecked(window._get_colorized())
         act_color.toggled.connect(lambda c: (window._set_colorized(c), window._apply_colorized_highlighter()))
         settings_menu.addAction(act_color)
+
+        act_theme = QAction("Theme", window)
+        act_theme.triggered.connect(lambda: getattr(window, "theme_manager", None) and window.theme_manager.toggle())
+        settings_menu.addAction(act_theme)
         
         act_clear = QAction("Clear Output Window", window)
         act_clear.triggered.connect(window._clear_output_window)
@@ -119,57 +125,33 @@ class UIFactory:
         bulk_menu.addAction(act_bulk_settings)
         bulk_btn.setMenu(bulk_menu)
 
-        # --- Title Bar Elements ---
-        # Note: We pass 'window' as parent for drag regions so they move the window
-        drag_left = DragRegion(window)
-        title = TitleDragLabel(f"PmGen {CURRENT_VERSION}", window)
-        drag_right = DragRegion(window)
+        def _on_update():
+            if not getattr(sys, "frozen", False):
+                CustomMessageBox.info(window, "Failed", "You are not running a compiled version...", self._icon_dir)
+            else:
+                window._start_update_check(silent=False)
 
-        btn_update = QToolButton()
-        btn_update.setObjectName("DialogBtn")
-        icon_path = os.path.join(self._icon_dir, "update.svg") 
-        if os.path.exists(icon_path):
-            btn_update.setIcon(QIcon(icon_path))
-        else:
-            btn_update.setText("Update")
+        bar = build_frameless_top_bar(
+            window,
+            WindowControlSpec(
+                title=f"PmGen {CURRENT_VERSION}",
+                icon_dir=self._icon_dir,
+                on_minimize=window.showMinimized,
+                on_toggle_fullscreen=window._toggle_fullscreen,
+                on_close=window._confirm_exit,
+                show_update=True,
+                on_update=_on_update,
+            ),
+        )
+        h = bar.layout()
+        nav = QWidget(bar)
+        nav_l = QHBoxLayout(nav)
+        nav_l.setContentsMargins(0, 0, SPACING_MD, 0)
+        nav_l.setSpacing(SPACING_SM)
+        nav_l.addWidget(settings_btn)
+        nav_l.addWidget(bulk_btn)
+        h.insertWidget(0, nav, 0)
 
-        btn_update.setToolTip("Check for Updates")
-        
-        if not getattr(sys, 'frozen', False):
-            btn_update.clicked.connect(lambda: CustomMessageBox.info(window, "Failed", "You are not running a compiled version...", self._icon_dir))
-        else:                
-            btn_update.clicked.connect(lambda: window._start_update_check(silent=False))
-
-        btn_min = QToolButton()
-        btn_min.setDefaultAction(QAction(QIcon(os.path.join(self._icon_dir, "minimize.svg")), "Min", window, triggered=window.showMinimized))
-        
-        window._act_full = QAction(QIcon(os.path.join(self._icon_dir, "fullscreen.svg")), "Max", window)
-        window._act_full.setCheckable(True)
-        window._act_full.triggered.connect(window._toggle_fullscreen)
-        
-        btn_full = QToolButton()
-        btn_full.setDefaultAction(window._act_full)
-        
-        btn_exit = QToolButton()
-        btn_exit.setDefaultAction(QAction(QIcon(os.path.join(self._icon_dir, "exit.svg")), "Exit", window, triggered=window._confirm_exit))
-
-        right_box = QWidget()
-        right_l = QHBoxLayout(right_box)
-        right_l.setContentsMargins(0,0,0,0)
-        right_l.setSpacing(0)
-        
-        right_l.addWidget(btn_update)
-        right_l.addWidget(btn_min)
-        right_l.addWidget(btn_full)
-        right_l.addWidget(btn_exit)
-
-        h.addWidget(settings_btn, 0)
-        h.addWidget(bulk_btn, 0)
-        h.addWidget(DragRegion(window), 1)
-        h.addWidget(title, 0)
-        h.addWidget(drag_right, 1)
-        h.addWidget(right_box, 0)
-        
         tb.addWidget(bar)
         return tb
 
@@ -180,19 +162,22 @@ class UIFactory:
         bar = QWidget(window)
         bar.setObjectName("SecondaryBar")
         h = QHBoxLayout(bar)
-        h.setContentsMargins(8, 6, 8, 6)
-        h.setSpacing(8)
+        h.setContentsMargins(SPACING_MD, SPACING_SM, SPACING_MD, SPACING_SM)
+        h.setSpacing(SPACING_SM)
 
         window.user_label = QLabel("Not signed in", bar)
         window.user_label.setObjectName("UserLabel")
+        window.user_label.setProperty("class", "muted")
         h.addWidget(window.user_label, 0, Qt.AlignmentFlag.AlignVCenter)
         h.addStretch(1)
 
         window._thr_label = QLabel("", bar)
         window._thr_label.setObjectName("DialogLabel")
+        window._thr_label.setProperty("class", "status-chip")
         
         window._basis_label = QLabel("", bar)
         window._basis_label.setObjectName("DialogLabel")
+        window._basis_label.setProperty("class", "status-chip")
         
         window._update_threshold_label()
         window._update_basis_label()
@@ -222,6 +207,7 @@ class UIFactory:
 
         window._generate_btn = QPushButton("Generate", bar)
         window._generate_btn.setObjectName("GenerateBtn")
+        window._generate_btn.setProperty("class", "primary")
         window._generate_btn.setFixedHeight(28)
         window._generate_btn.clicked.connect(window._on_generate_clicked)
 

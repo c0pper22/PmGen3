@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PyQt6.QtCore import Qt
 
 from pmgen.io.db_access import CatalogDB
@@ -152,8 +154,12 @@ def test_canon_mappings_tab_global_tester_finds_first_match(qtbot):
     assert "Output: DRUM[K]" in out
 
 
-def test_catalog_db_available_canon_items_expands_channel_templates(tmp_path, monkeypatch):
-    db_path = tmp_path / "catalog_manager.db"
+def test_catalog_db_available_canon_items_expands_channel_templates(monkeypatch):
+    temp_dir = Path("tmp_test_data")
+    temp_dir.mkdir(exist_ok=True)
+    db_path = temp_dir / "catalog_manager.db"
+    if db_path.exists():
+        db_path.unlink()
     monkeypatch.setattr("pmgen.io.db_access.get_db_path", lambda: str(db_path))
 
     db = CatalogDB()

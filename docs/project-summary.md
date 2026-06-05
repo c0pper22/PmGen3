@@ -19,6 +19,12 @@ PmGen is a local desktop system with three major external dependencies: Toshiba 
 
 The application boundary is intentionally thick: it owns report parsing, canon normalization, catalog editing, inventory management, report formatting, update orchestration, and PyInstaller packaging. External systems provide source data and release artifacts, but the core maintenance logic lives inside the `pmgen` package.
 
+### PyQt6 UI Architecture
+
+The desktop UI uses a token-based theme system in `pmgen/ui/theme.py`. `ThemeManager` applies `DARK_QSS` or `LIGHT_QSS`, persists the selected mode in QSettings under `ui/theme_mode`, and keeps dark mode as the default when no saved preference exists.
+
+Frameless window behavior is centralized in `pmgen/ui/shell.py`, including shared top-bar controls, icon resolution, and edge-resize behavior for both `MainWindow` and `CatalogEditorWindow`. Main dashboard composition lives in page/widget modules: `pmgen/ui/pages.py` builds the Single and Inventory tab wrappers, `pmgen/ui/widgets.py` provides reusable card and table helpers, and `pmgen/ui/bulk_run.py` owns dynamic bulk-run tabs while `pmgen/ui/main_window.py` coordinates application workflows.
+
 ## 3. Processing Pipeline
 
 ![Processing Pipeline](diagrams/processing-pipeline.drawio.png)

@@ -1,5 +1,12 @@
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QColor, QBrush
+from pmgen.ui.theme import (
+    COLOR_DANGER,
+    COLOR_ERROR,
+    COLOR_ON_SURFACE_VARIANT,
+    COLOR_PRIMARY_CONTAINER,
+    COLOR_SUCCESS,
+)
 
 class BulkQueueModel(QAbstractTableModel):
     def __init__(self, custom_col_name="", parent=None):
@@ -49,11 +56,11 @@ class BulkQueueModel(QAbstractTableModel):
         
         if role == Qt.ItemDataRole.ForegroundRole and col == self.status_col:
             status = self._data[row][6]
-            if status == "Done": return QBrush(QColor("#40ed68"))       # Green
-            if status == "Failed": return QBrush(QColor("#f7768e"))     # Pink/Red
-            if status == "Processing": return QBrush(QColor("#7aa2f7")) # Blue
-            if status == "Queued": return QBrush(QColor("#bbbbbb"))     # Grey
-            if status == "Filtered": return QBrush(QColor("#d83d37"))   # Red/Orange
+            if status == "Done": return QBrush(QColor(COLOR_SUCCESS))
+            if status == "Failed": return QBrush(QColor(COLOR_ERROR))
+            if status == "Processing": return QBrush(QColor(COLOR_PRIMARY_CONTAINER))
+            if status == "Queued": return QBrush(QColor(COLOR_ON_SURFACE_VARIANT))
+            if status == "Filtered": return QBrush(QColor(COLOR_DANGER))
 
         return None
 

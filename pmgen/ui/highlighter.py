@@ -1,6 +1,7 @@
 import re
 from PyQt6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 from PyQt6.QtCore import Qt
+from pmgen.ui.theme import OUTPUT_HIGHLIGHT_COLORS
 
 class OutputHighlighter(QSyntaxHighlighter):
     def __init__(self, parent_doc):
@@ -60,50 +61,38 @@ class OutputHighlighter(QSyntaxHighlighter):
 
     def _build_formats(self):
         """Initialize all text styles."""
-        # General Styles
-        self.fmt_normal = self._mkfmt("#ffffff", bold=True)
-        self.fmt_muted  = self._mkfmt("#888888", italic=True)
-        self.fmt_header = self._mkfmt("#7aa2f7", bold=True)
-        self.fmt_rule   = self._mkfmt("#444444")
-        self.fmt_info   = self._mkfmt("#D8B30C", bold=True)
-        self.fmt_label  = self._mkfmt("#c0caf5", bold=True)
-        self.fmt_alert         = self._mkfmt("#ff0000", bold=True)
-        self.fmt_customer_value = self._mkfmt("#bb97fd", bold=True)
-
-        # Bulk Report Styles
-        self.fmt_bulk          = self._mkfmt("#a680eb", bold=True)
-        self.fmt_bulk_serial   = self._mkfmt("#FFFF55", bold=True)
-        self.fmt_bulk_ok       = self._mkfmt("#00ff3c", bold=True)
-        self.fmt_bulk_filtered = self._mkfmt("#d83d37", bold=True)
-        self.fmt_pct_low       = self._mkfmt("#40ed68", bold=True)
-        self.fmt_pct_mid       = self._mkfmt("#f79346", bold=True)
-        self.fmt_pct_high      = self._mkfmt("#d83d37", bold=True)
-
-        # Kit / Part Styles
-        self.fmt_kit_row = self._mkfmt("#a6da95")
-        
-        # Due Items Styles
-        self.fmt_due_bullet   = self._mkfmt("#f7768e", bold=True)
-        self.fmt_due_row_base = self._mkfmt("#bbbbbb")
-        self.fmt_due_canon    = self._mkfmt("#1c94d5", bold=True)
-        self.fmt_due_pct      = self._mkfmt("#e0af68", bold=True)
-        self.fmt_due_flag     = self._mkfmt("#f7768e", bold=True)
-
-        # Model Info Styles
-        self.fmt_model_value  = self._mkfmt("#a6da95", bold=True)
-        self.fmt_serial_value = self._mkfmt("#7dcfff", bold=True)
-        self.fmt_r_date_value = self._mkfmt("#e0af68")
-        self.fmt_u_date_value = self._mkfmt("#f77564")
-
-        # Threshold / Badge Styles
-        self.fmt_badge_line_base = self._mkfmt("#bfbfbf")
-        self.fmt_thresh_value    = self._mkfmt("#fb7127", bold=True)
-        self.fmt_basis_badge     = self._mkfmt("#fb7127", bold=True)
-
-        # Counters Styles
-        self.fmt_counters_base = self._mkfmt("#bfbfbf")
-        self.fmt_kv_label      = self._mkfmt("#1c94d5", bold=True)
-        self.fmt_kv_value      = self._mkfmt("#e0af68", bold=True)
+        colors = OUTPUT_HIGHLIGHT_COLORS
+        self.fmt_normal = self._mkfmt(colors["normal"], bold=True)
+        self.fmt_muted = self._mkfmt(colors["muted"], italic=True)
+        self.fmt_header = self._mkfmt(colors["header"], bold=True)
+        self.fmt_rule = self._mkfmt(colors["rule"])
+        self.fmt_info = self._mkfmt(colors["info"], bold=True)
+        self.fmt_label = self._mkfmt(colors["label"], bold=True)
+        self.fmt_alert = self._mkfmt(colors["alert"], bold=True)
+        self.fmt_customer_value = self._mkfmt(colors["customer_value"], bold=True)
+        self.fmt_bulk = self._mkfmt(colors["bulk"], bold=True)
+        self.fmt_bulk_serial = self._mkfmt(colors["bulk_serial"], bold=True)
+        self.fmt_bulk_ok = self._mkfmt(colors["bulk_ok"], bold=True)
+        self.fmt_bulk_filtered = self._mkfmt(colors["bulk_filtered"], bold=True)
+        self.fmt_pct_low = self._mkfmt(colors["pct_low"], bold=True)
+        self.fmt_pct_mid = self._mkfmt(colors["pct_mid"], bold=True)
+        self.fmt_pct_high = self._mkfmt(colors["pct_high"], bold=True)
+        self.fmt_kit_row = self._mkfmt(colors["kit_row"])
+        self.fmt_due_bullet = self._mkfmt(colors["due_bullet"], bold=True)
+        self.fmt_due_row_base = self._mkfmt(colors["due_row_base"])
+        self.fmt_due_canon = self._mkfmt(colors["due_canon"], bold=True)
+        self.fmt_due_pct = self._mkfmt(colors["due_pct"], bold=True)
+        self.fmt_due_flag = self._mkfmt(colors["due_flag"], bold=True)
+        self.fmt_model_value = self._mkfmt(colors["model_value"], bold=True)
+        self.fmt_serial_value = self._mkfmt(colors["serial_value"], bold=True)
+        self.fmt_r_date_value = self._mkfmt(colors["report_date"])
+        self.fmt_u_date_value = self._mkfmt(colors["unpacking_date"])
+        self.fmt_badge_line_base = self._mkfmt(colors["badge_line_base"])
+        self.fmt_thresh_value = self._mkfmt(colors["threshold_value"], bold=True)
+        self.fmt_basis_badge = self._mkfmt(colors["basis_badge"], bold=True)
+        self.fmt_counters_base = self._mkfmt(colors["counters_base"])
+        self.fmt_kv_label = self._mkfmt(colors["kv_label"], bold=True)
+        self.fmt_kv_value = self._mkfmt(colors["kv_value"], bold=True)
 
     def highlightBlock(self, text: str):
         """Main entry point for syntax highlighting."""
