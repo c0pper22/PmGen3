@@ -900,9 +900,19 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             txt = "Threshold: 100.0%" if not self._get_threshold_enabled() else f"Threshold: {self._get_threshold() * 100:.1f}%"
             self._thr_label.setText(txt)
 
-    def _update_basis_label(self):
-        if hasattr(self, "_basis_label"):
-            self._basis_label.setText(f"Basis: {self._get_life_basis().upper()}")
+    def _update_basis_button(self):
+        if hasattr(self, "_basis_button"):
+            basis = self._get_life_basis()
+            self._basis_button.setText(f"Basis: {basis.upper()}")
+            self._basis_button.setProperty("basis", basis)
+            self._basis_button.style().unpolish(self._basis_button)
+            self._basis_button.style().polish(self._basis_button)
+
+    def _toggle_life_basis(self):
+        current = self._get_life_basis()
+        new = "drive" if current == "page" else "page"
+        self._set_life_basis(new)
+        self._update_basis_button()
 
     def _auto_capitalize(self, text: str):
         le = self._id_combo.lineEdit()
@@ -1130,7 +1140,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         box = QComboBox(dlg); box.setObjectName("DialogInput"); box.addItems(["Page", "Drive"])
         box.setCurrentIndex(0 if self._get_life_basis() == "page" else 1)
         btn = QPushButton("Save", dlg)
-        btn.clicked.connect(lambda: (self._set_life_basis("page" if box.currentIndex()==0 else "drive"), self._update_basis_label(), dlg.accept()))
+        btn.clicked.connect(lambda: (self._set_life_basis("page" if box.currentIndex()==0 else "drive"), self._update_basis_button(), dlg.accept()))
         dlg._content_layout.addWidget(lbl); dlg._content_layout.addWidget(box)
         r = QHBoxLayout(); r.addStretch(1); r.addWidget(btn); dlg._content_layout.addLayout(r)
         dlg.exec()

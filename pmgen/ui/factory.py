@@ -169,15 +169,16 @@ class UIFactory:
         window._thr_label.setObjectName("ThresholdBadge")
         window._thr_label.setProperty("class", "status-chip")
         
-        window._basis_label = QLabel("", bar)
-        window._basis_label.setObjectName("BasisBadge")
-        window._basis_label.setProperty("class", "status-chip")
-        
+        window._basis_button = QPushButton("", bar)
+        window._basis_button.setObjectName("BasisToggle")
+        window._basis_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        window._basis_button.clicked.connect(window._toggle_life_basis)
+
         window._update_threshold_label()
-        window._update_basis_label()
-        
+        window._update_basis_button()
+
         h.addWidget(window._thr_label, 0, Qt.AlignmentFlag.AlignVCenter)
-        h.addWidget(window._basis_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        h.addWidget(window._basis_button, 0, Qt.AlignmentFlag.AlignVCenter)
 
         window._id_combo = QComboBox(bar)
         window._id_combo.setObjectName("IdInput")

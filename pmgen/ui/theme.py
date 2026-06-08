@@ -338,6 +338,28 @@ QPushButton:disabled {{
     background: {surface_high};
     border-color: {subtle_border};
 }}
+QPushButton#BasisToggle {{
+    color: {COLOR_PRIMARY};
+    background: {COLOR_PRIMARY_FIXED};
+    border: 1px solid {COLOR_PRIMARY_FIXED_DIM};
+    border-radius: {radius_badge}px;
+    padding: {SPACING_XS}px {SPACING_SM}px;
+    font-size: {TYPO_LABEL_SM[0]}px;
+    font-weight: {TYPO_LABEL_SM[1]};
+}}
+QPushButton#BasisToggle:hover {{
+    background: {COLOR_PRIMARY_FIXED_DIM};
+    border-color: {COLOR_PRIMARY};
+}}
+QPushButton#BasisToggle[basis="drive"] {{
+    color: {COLOR_TERTIARY};
+    background: #fde8db;
+    border-color: #f8c7ae;
+}}
+QPushButton#BasisToggle[basis="drive"]:hover {{
+    background: #f8c7ae;
+    border-color: {COLOR_TERTIARY};
+}}
 
 QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox, QListWidget {{
     background: {surface_low};
