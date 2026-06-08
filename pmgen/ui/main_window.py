@@ -583,6 +583,9 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
         QTimer.singleShot(1500, lambda: self._start_update_check(silent=True))
 
+        # Apply initial window corner rounding from saved preference
+        self.apply_window_roundness(self._get_corner_roundness())
+
     # =========================================================================
     #  Tab Management
     # =========================================================================
@@ -1177,6 +1180,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             manager = getattr(self, "theme_manager", None)
             if manager is not None:
                 manager.reapply()
+            self.apply_window_roundness(value)
 
         btn_theme.clicked.connect(lambda _checked=False: _toggle_theme())
         corner_slider.valueChanged.connect(lambda v: corner_box.setValue(int(v)))

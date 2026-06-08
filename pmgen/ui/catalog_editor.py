@@ -1196,6 +1196,9 @@ class CatalogEditorWindow(WindowResizeMixin, QMainWindow):
 
         self.setCentralWidget(central)
 
+        # Apply initial window corner rounding from saved preference
+        self.apply_window_roundness()
+
     def _toggle_fullscreen(self, checked: bool):
         if checked:
             self.showFullScreen()
