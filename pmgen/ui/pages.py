@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QPlainTextEdit, QTabBar, QTabWidget, QVBoxLayout, QW
 
 from .factory import UIFactory
 from .inventory import InventoryTab
-from .theme import SPACING_MD
+from .theme import SPACING_MD, SPACING_SM
 
 
 class MainWindowProtocol(Protocol):
@@ -20,7 +20,7 @@ class SingleReportPage(QWidget):
         super().__init__(parent)
         self.setObjectName("TabHome")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, SPACING_SM, 0, 0)
         layout.setSpacing(SPACING_MD)
 
         factory = UIFactory(icon_dir)
@@ -40,7 +40,7 @@ class InventoryPage(QWidget):
         super().__init__(parent)
         self.setObjectName("TabInventoryPage")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, SPACING_SM, 0, 0)
         layout.setSpacing(0)
         window.tab_tools = InventoryTab(window, icon_dir=icon_dir)
         window.tab_tools.setObjectName("TabInventory")

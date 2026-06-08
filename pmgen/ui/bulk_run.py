@@ -158,7 +158,7 @@ class BulkRunTab(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, SPACING_SM, 0, 0)
         layout.setSpacing(SPACING_MD)
 
         header_card = make_card(self, "BulkRunHeader")
