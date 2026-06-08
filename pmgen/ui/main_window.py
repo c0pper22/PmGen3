@@ -216,7 +216,7 @@ class BulkRunTab(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
         # --- Top Bar: Status, Progress, Search, Export, Stop ---

@@ -450,12 +450,14 @@ QProgressBar#ProgressBar::chunk {{
 }}
 
 QTabWidget::pane {{
-    border: 1px solid {subtle_border};
+    border-left: 1px solid {subtle_border};
+    border-right: 1px solid {subtle_border};
+    border-bottom: 1px solid {subtle_border};
+    border-top: none;
     background: {bg};
     border-radius: {radius_lg}px;
     margin-top: -1px;
 }}
-QTabWidget::tab-bar {{ alignment: left; }}
 QTabBar::tab {{
     background: {surface};
     color: {muted};
@@ -466,6 +468,9 @@ QTabBar::tab {{
     border-top-right-radius: {radius_default}px;
     margin-right: {SPACING_XS}px;
     font-weight: 600;
+}}
+QTabBar::tab:first {{
+    margin-left: 1px;
 }}
 QTabBar::tab:selected {{
     background: {surface_low};
@@ -546,7 +551,6 @@ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: 
     background: {surface_low};
     border: 1px solid {subtle_border};
     border-radius: {radius_lg}px;
-    padding: {SPACING_LG}px;
 }}
 #MainEditor {{
     background: {surface_low};

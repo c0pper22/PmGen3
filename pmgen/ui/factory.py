@@ -154,6 +154,7 @@ class UIFactory:
         """
         bar = QWidget(window)
         bar.setObjectName("SecondaryBar")
+        bar.setFixedHeight(56)
         h = QHBoxLayout(bar)
         h.setContentsMargins(SPACING_MD, SPACING_SM, SPACING_MD, SPACING_SM)
         h.setSpacing(SPACING_SM)
@@ -184,7 +185,7 @@ class UIFactory:
         window._id_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         window._id_combo.setMaxVisibleItems(15) 
         window._id_combo.setMinimumWidth(200)
-        window._id_combo.setFixedHeight(28)
+        window._id_combo.setFixedHeight(32)
 
         le = window._id_combo.lineEdit()
         le.setValidator(QRegularExpressionValidator(QRegularExpression(r"[A-Za-z0-9]*"), window))
@@ -201,7 +202,7 @@ class UIFactory:
         window._generate_btn = QPushButton("Generate", bar)
         window._generate_btn.setObjectName("GenerateBtn")
         window._generate_btn.setProperty("class", "primary")
-        window._generate_btn.setFixedHeight(28)
+        window._generate_btn.setFixedHeight(32)
         window._generate_btn.clicked.connect(window._on_generate_clicked)
 
         h.addWidget(window._id_combo, 0)

@@ -225,11 +225,12 @@ class InventoryTab(QWidget):
     def __init__(self, parent=None, icon_dir=None):
         super().__init__(parent)
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(SPACING_MD, SPACING_MD, SPACING_MD, SPACING_MD)
+        self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(SPACING_MD)
         self.icon_dir = icon_dir
 
         toolbar = make_card(self, "InventoryToolbar")
+        toolbar.setFixedHeight(56)
         top_bar = QHBoxLayout(toolbar)
         top_bar.setContentsMargins(SPACING_MD, SPACING_SM, SPACING_MD, SPACING_SM)
         top_bar.setSpacing(SPACING_SM)

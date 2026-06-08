@@ -158,10 +158,11 @@ class BulkRunTab(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(SPACING_MD, SPACING_MD, SPACING_MD, SPACING_MD)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(SPACING_MD)
 
         header_card = make_card(self, "BulkRunHeader")
+        header_card.setFixedHeight(56)
         header_layout = QHBoxLayout(header_card)
         header_layout.setContentsMargins(SPACING_MD, SPACING_SM, SPACING_MD, SPACING_SM)
         header_layout.setSpacing(SPACING_SM)
@@ -186,11 +187,13 @@ class BulkRunTab(QWidget):
         self.btn_export = QPushButton("Export", header_card)
         self.btn_export.setObjectName("BulkExportBtn")
         self.btn_export.setProperty("class", "secondary")
+        self.btn_export.setFixedHeight(32)
         self.btn_export.clicked.connect(self._export_to_excel)
 
         self.btn_stop = QPushButton("Stop", header_card)
         self.btn_stop.setObjectName("BulkStopBtn")
         self.btn_stop.setProperty("class", "danger")
+        self.btn_stop.setFixedHeight(32)
         self.btn_stop.clicked.connect(self.stop)
         self.btn_stop.setEnabled(False)
 
