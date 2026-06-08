@@ -27,7 +27,7 @@ COLOR_OUTLINE = "#737685"
 COLOR_OUTLINE_VARIANT = "#c3c6d6"
 
 # Primary brand
-COLOR_PRIMARY = "#003d9b"
+COLOR_PRIMARY = "#003d9b" # ACCENT COLOR
 COLOR_ON_PRIMARY = "#ffffff"
 COLOR_PRIMARY_CONTAINER = "#0052cc"
 COLOR_ON_PRIMARY_CONTAINER = "#c4d2ff"
@@ -68,7 +68,7 @@ DARK_OUTLINE = "#4A505C"
 DARK_ON_SURFACE = "#F1F3F5"
 DARK_ON_SURFACE_VARIANT = "#A7ADB7"
 DARK_PRIMARY = "#b2c5ff"
-DARK_PRIMARY_CONTAINER = "#0040a2"
+DARK_PRIMARY_CONTAINER = "#0040a2" # ACCENT COLOR
 
 # Semantic colors
 COLOR_SUCCESS = "#1e7d4a"
@@ -458,11 +458,14 @@ QTabWidget::pane {{
     border-radius: {radius_lg}px;
     margin-top: -1px;
 }}
+QTabBar {{
+    qproperty-drawBase: 0;
+}}
 QTabBar::tab {{
     background: {surface};
     color: {muted};
     padding: {SPACING_SM}px {SPACING_LG}px;
-    border: 1px solid {subtle_border};
+    border-top: 2px solid {primary};
     border-bottom: none;
     border-top-left-radius: {radius_default}px;
     border-top-right-radius: {radius_default}px;
@@ -514,7 +517,7 @@ QTableCornerButton::section {{
 }}
 QSplitter::handle {{ background: {bg}; }}
 QScrollBar:vertical {{
-    border-left: 1px solid {subtle_border};
+    border: 1px solid {subtle_border};
     background: {surface};
     width: 14px;
     margin: 0px;
@@ -531,7 +534,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
 
 QScrollBar:horizontal {{
-    border-top: 1px solid {subtle_border};
+    border: 1px solid {subtle_border};
     background: {surface};
     height: 14px;
     margin: 0px;
