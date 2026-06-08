@@ -147,6 +147,12 @@ def _popup_radius(scale: float) -> int:
     # Keep popups clearly rounded, but avoid oversized corners that look distorted.
     return min(_scaled_radius(RADIUS_DEFAULT, scale), 10)
 
+
+def _scrollbar_radius(scale: float) -> int:
+    # Scrollbars are narrow (14 px); cap to prevent rendering collapse.
+    return min(_scaled_radius(RADIUS_DEFAULT, scale), 6)
+
+
 OUTPUT_HIGHLIGHT_COLORS = {
     "normal": COLOR_ON_PRIMARY,
     "muted": DARK_ON_SURFACE_VARIANT,
@@ -206,6 +212,7 @@ def _qss(
     radius_popup: int,
     radius_badge: int,
     radius_full: int,
+    radius_scrollbar: int,
 ) -> str:
     combo_arrow_url = combo_arrow.as_posix()
     spin_up_arrow_url = spin_up_arrow.as_posix()
@@ -480,14 +487,25 @@ QHeaderView::section {{
     background-color: {surface};
     color: {text};
     padding: {SPACING_SM}px;
-    border: none;
+    border-top: 1px solid {subtle_border};
     border-bottom: 1px solid {subtle_border};
+    border-left: none;
+    border-right: none;
     font-size: {TYPO_LABEL_MD[0]}px;
     font-weight: {TYPO_LABEL_MD[1]};
+}}
+QHeaderView::section:first {{
+    border-top-left-radius: {radius_lg}px;
+    border-left: 1px solid {subtle_border};
+}}
+QHeaderView::section:last {{
+    border-top-right-radius: {radius_lg}px;
+    border-right: 1px solid {subtle_border};
 }}
 QTableCornerButton::section {{
     background-color: {surface};
     border: 1px solid {subtle_border};
+    border-top-left-radius: {radius_lg}px;
 }}
 QSplitter::handle {{ background: {bg}; }}
 QScrollBar:vertical {{
@@ -495,16 +513,34 @@ QScrollBar:vertical {{
     background: {surface};
     width: 14px;
     margin: 0px;
+    border-radius: {radius_scrollbar}px;
 }}
 QScrollBar::handle:vertical {{
     background: {border};
     min-height: 20px;
-    border-radius: {radius_default}px;
+    border-radius: {radius_sm}px;
     margin: 2px;
 }}
 QScrollBar::handle:vertical:hover {{ background: {primary}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
+
+QScrollBar:horizontal {{
+    border-top: 1px solid {subtle_border};
+    background: {surface};
+    height: 14px;
+    margin: 0px;
+    border-radius: {radius_scrollbar}px;
+}}
+QScrollBar::handle:horizontal {{
+    background: {border};
+    min-width: 20px;
+    border-radius: {radius_sm}px;
+    margin: 2px;
+}}
+QScrollBar::handle:horizontal:hover {{ background: {primary}; }}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0px; }}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: none; }}
 
 #SecondaryBar {{
     background: {surface_low};
@@ -634,7 +670,7 @@ QDialog#FramelessDialogRoot {{
 """
 
 
-def _radii_for_strength(corner_strength: int) -> tuple[int, int, int, int, int, int]:
+def _radii_for_strength(corner_strength: int) -> tuple[int, int, int, int, int, int, int]:
     scale = _corner_scale(corner_strength)
     return (
         _scaled_radius(RADIUS_SM, scale),
@@ -642,12 +678,13 @@ def _radii_for_strength(corner_strength: int) -> tuple[int, int, int, int, int, 
         _scaled_radius(RADIUS_LG, scale),
         _popup_radius(scale),
         _badge_radius(scale),
-        RADIUS_FULL,
+        _scaled_radius(RADIUS_FULL, scale),
+        _scrollbar_radius(scale),
     )
 
 
 def _build_light_qss(corner_strength: int) -> str:
-    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full = _radii_for_strength(corner_strength)
+    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full, radius_scrollbar = _radii_for_strength(corner_strength)
     return _qss(
         bg=COLOR_BACKGROUND,
         surface=COLOR_SURFACE_LOWEST,
@@ -671,11 +708,12 @@ def _build_light_qss(corner_strength: int) -> str:
         radius_popup=radius_popup,
         radius_badge=radius_badge,
         radius_full=radius_full,
+        radius_scrollbar=radius_scrollbar,
     )
 
 
 def _build_dark_qss(corner_strength: int) -> str:
-    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full = _radii_for_strength(corner_strength)
+    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full, radius_scrollbar = _radii_for_strength(corner_strength)
     return _qss(
         bg=DARK_BACKGROUND,
         surface=DARK_SURFACE,
@@ -699,6 +737,7 @@ def _build_dark_qss(corner_strength: int) -> str:
         radius_popup=radius_popup,
         radius_badge=radius_badge,
         radius_full=radius_full,
+        radius_scrollbar=radius_scrollbar,
     )
 
 
