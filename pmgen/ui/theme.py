@@ -43,7 +43,7 @@ COLOR_SECONDARY_CONTAINER = "#d4e0f8"
 COLOR_ON_SECONDARY_CONTAINER = "#576377"
 
 # Tertiary
-COLOR_TERTIARY = "#7b2600"
+COLOR_TERTIARY = "#5c007b"
 COLOR_ON_TERTIARY = "#ffffff"
 COLOR_TERTIARY_CONTAINER = "#a33500"
 COLOR_ON_TERTIARY_CONTAINER = "#ffc6b2"
@@ -188,6 +188,21 @@ OUTPUT_HIGHLIGHT_COLORS = {
 }
 
 
+def _hex_to_rgba(hex_color: str, alpha: float) -> str:
+    """Convert a hex color (e.g. ``#003d9b``) to an ``rgba(r,g,b,a)`` string.
+
+    Args:
+        hex_color: 6-digit hex color with optional leading ``#``.
+        alpha: Opacity in the range 0.0–1.0.
+    """
+    hex_color = hex_color.lstrip("#")
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    a = max(0, min(255, int(round(alpha * 255))))
+    return f"rgba({r},{g},{b},{a})"
+
+
 def _qss(
     *,
     bg: str,
@@ -201,6 +216,7 @@ def _qss(
     primary: str,
     primary_text: str,
     primary_hover: str,
+    tertiary: str,
     danger: str,
     danger_bg: str,
     combo_arrow: Path,
@@ -217,6 +233,15 @@ def _qss(
     combo_arrow_url = combo_arrow.as_posix()
     spin_up_arrow_url = spin_up_arrow.as_posix()
     spin_down_arrow_url = spin_down_arrow.as_posix()
+    # Pre-compute rgba variants used by BasisToggle / ThresholdToggle
+    primary_rgba_12 = _hex_to_rgba(primary, 0.12)
+    primary_rgba_22 = _hex_to_rgba(primary, 0.22)
+    primary_rgba_40 = _hex_to_rgba(primary, 0.40)
+    primary_rgba_65 = _hex_to_rgba(primary, 0.65)
+    tertiary_rgba_12 = _hex_to_rgba(tertiary, 0.12)
+    tertiary_rgba_22 = _hex_to_rgba(tertiary, 0.22)
+    tertiary_rgba_40 = _hex_to_rgba(tertiary, 0.40)
+    tertiary_rgba_65 = _hex_to_rgba(tertiary, 0.65)
     return f"""
 QMainWindow, QDialog, QWidget {{
     background: {bg};
@@ -228,7 +253,7 @@ QMainWindow, QDialog, QWidget {{
 QLabel {{ color: {text}; background: transparent; }}
 QLabel[class="muted"], QLabel#DialogLabel {{ color: {muted}; }}
 QLabel[class="success-label"] {{ color: {COLOR_SUCCESS}; font-weight: 700; }}
-QLabel[class="status-chip"], QLabel#ThresholdBadge, QLabel#BasisBadge {{
+QLabel[class="status-chip"] {{
     color: {muted};
     background: {surface_high};
     border: 1px solid {subtle_border};
@@ -339,26 +364,40 @@ QPushButton:disabled {{
     border-color: {subtle_border};
 }}
 QPushButton#BasisToggle {{
-    color: {COLOR_PRIMARY};
-    background: {COLOR_PRIMARY_FIXED};
-    border: 1px solid {COLOR_PRIMARY_FIXED_DIM};
+    color: {primary};
+    background: {primary_rgba_12};
+    border: 1px solid {primary_rgba_40};
     border-radius: {radius_badge}px;
     padding: {SPACING_XS}px {SPACING_SM}px;
     font-size: {TYPO_LABEL_SM[0]}px;
     font-weight: {TYPO_LABEL_SM[1]};
 }}
 QPushButton#BasisToggle:hover {{
-    background: {COLOR_PRIMARY_FIXED_DIM};
-    border-color: {COLOR_PRIMARY};
+    background: {primary_rgba_22};
+    border-color: {primary_rgba_65};
 }}
 QPushButton#BasisToggle[basis="drive"] {{
-    color: {COLOR_TERTIARY};
-    background: #fde8db;
-    border-color: #f8c7ae;
+    color: {tertiary};
+    background: {tertiary_rgba_12};
+    border-color: {tertiary_rgba_40};
 }}
 QPushButton#BasisToggle[basis="drive"]:hover {{
-    background: #f8c7ae;
-    border-color: {COLOR_TERTIARY};
+    background: {tertiary_rgba_22};
+    border-color: {tertiary_rgba_65};
+}}
+QPushButton#ThresholdToggle {{
+    color: {muted};
+    background: {surface_high};
+    border: 1px solid {subtle_border};
+    border-radius: {radius_badge}px;
+    padding: {SPACING_XS}px {SPACING_SM}px;
+    font-size: {TYPO_LABEL_SM[0]}px;
+    font-weight: {TYPO_LABEL_SM[1]};
+}}
+QPushButton#ThresholdToggle:hover {{
+    background: {surface};
+    border-color: {muted};
+    color: {text};
 }}
 
 QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox, QListWidget {{
@@ -726,6 +765,7 @@ def _build_light_qss(corner_strength: int) -> str:
         primary=COLOR_PRIMARY,
         primary_text=COLOR_ON_PRIMARY,
         primary_hover=COLOR_PRIMARY_CONTAINER,
+        tertiary=COLOR_TERTIARY,
         danger=COLOR_DANGER,
         danger_bg=COLOR_DANGER_BG,
         combo_arrow=_COMBO_DOWN_LIGHT,
@@ -755,6 +795,7 @@ def _build_dark_qss(corner_strength: int) -> str:
         primary=DARK_PRIMARY_CONTAINER,
         primary_text=COLOR_ON_PRIMARY,
         primary_hover=COLOR_PRIMARY_CONTAINER,
+        tertiary=COLOR_TERTIARY,
         danger=COLOR_DANGER,
         danger_bg=DARK_SURFACE_HIGH,
         combo_arrow=_COMBO_DOWN_DARK,

@@ -694,7 +694,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
     def _set_threshold_enabled(self, on: bool):
         QSettings().setValue(self.THRESH_ENABLED_KEY, bool(on))
-        self._update_threshold_label()
+        self._update_threshold_button()
 
     def _get_life_basis(self) -> str:
         v = (QSettings().value(self.LIFE_BASIS_KEY, "page", str) or "page").lower()
@@ -895,10 +895,58 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     #  Actions & Logic
     # =========================================================================
 
-    def _update_threshold_label(self):
-        if hasattr(self, "_thr_label"):
-            txt = "Threshold: 100.0%" if not self._get_threshold_enabled() else f"Threshold: {self._get_threshold() * 100:.1f}%"
-            self._thr_label.setText(txt)
+    def _update_threshold_button(self):
+        if not hasattr(self, "_thr_button"):
+            return
+        enabled = self._get_threshold_enabled()
+        if enabled:
+            value = self._get_threshold()
+            pct = int(value * 100)
+            self._thr_button.setText(f"Threshold: {pct}%")
+            r, g, b = self._threshold_heat_color(value)
+            self._thr_button.setStyleSheet(
+                f"QPushButton#ThresholdToggle {{"
+                f"  color: #{r:02x}{g:02x}{b:02x};"
+                f"  background: rgba({r},{g},{b},31);"
+                f"  border-color: rgba({r},{g},{b},102);"
+                f"}}"
+                f"QPushButton#ThresholdToggle:hover {{"
+                f"  background: rgba({r},{g},{b},56);"
+                f"  border-color: rgba({r},{g},{b},166);"
+                f"}}"
+            )
+        else:
+            self._thr_button.setText("Threshold: 100%")
+            self._thr_button.setStyleSheet("")
+
+    def _threshold_heat_color(self, value: float):
+        """0.0 → green (#40a02b), 0.5 → yellow (#df8e1d), 1.0 → red (#ba1a1a)."""
+        if value <= 0.5:
+            t = value / 0.5
+            r = int(0x40 + t * (0xdf - 0x40))
+            g = int(0xa0 + t * (0x8e - 0xa0))
+            b = int(0x2b + t * (0x1d - 0x2b))
+        else:
+            t = (value - 0.5) / 0.5
+            r = int(0xdf + t * (0xba - 0xdf))
+            g = int(0x8e + t * (0x1a - 0x8e))
+            b = int(0x1d + t * (0x1a - 0x1d))
+        return max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))
+
+    def _toggle_threshold_enabled(self):
+        self._set_threshold_enabled(not self._get_threshold_enabled())
+        self._update_threshold_button()
+
+    def eventFilter(self, obj, event):
+        if obj is getattr(self, "_thr_button", None) and event.type() == QEvent.Type.Wheel:
+            if self._get_threshold_enabled():
+                delta = event.angleDelta().y()
+                step = 0.05 if delta > 0 else -0.05
+                new_val = max(0.0, min(1.0, self._get_threshold() + step))
+                self._set_threshold(new_val)
+                self._update_threshold_button()
+            return True
+        return super().eventFilter(obj, event)
 
     def _update_basis_button(self):
         if hasattr(self, "_basis_button"):
@@ -1083,7 +1131,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         pct_box.valueChanged.connect(lambda v: slider.setValue(int(v)))
 
         save_btn = QPushButton("Save", dlg)
-        save_btn.clicked.connect(lambda: (self._set_threshold(pct_box.value()/100.0), self._update_threshold_label(), dlg.accept()))
+        save_btn.clicked.connect(lambda: (self._set_threshold(pct_box.value()/100.0), self._update_threshold_button(), dlg.accept()))
 
         dlg._content_layout.addWidget(top); dlg._content_layout.addWidget(enable_cb)
         r1 = QHBoxLayout(); r1.addWidget(slider, 1); r1.addWidget(pct_box); dlg._content_layout.addLayout(r1)
