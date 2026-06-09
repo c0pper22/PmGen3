@@ -21,13 +21,17 @@ from PyQt6.QtWidgets import (
     QPushButton, QLineEdit, QComboBox, QCheckBox, QSlider, 
     QSpinBox, QDoubleSpinBox, QFileDialog, QProgressBar, QCompleter,
     QTabWidget, QTableView, QHeaderView, QSplitter, QTabBar, QGridLayout,
-    QProgressDialog
+    QProgressDialog, QTableWidget, QTableWidgetItem, QAbstractItemView
 )
 
 # Imports from our new split files
 from pmgen.ui.bulk_model import BulkQueueModel
 from pmgen.system.wrappers import safe_slot
 from .theme import SPACING_LG, SPACING_MD, apply_static_theme
+from .theme import (
+    RADIUS_LG, CORNER_ROUNDNESS_KEY, CORNER_ROUNDNESS_DEFAULT,
+    _corner_scale, _scaled_radius,
+)
 from .components import (
     DragRegion, TitleDragLabel, FramelessDialog, CustomMessageBox, ResizeState, LoadingDialog
 )
@@ -490,7 +494,7 @@ BULK_SETTINGS_TOOLTIPS = {
     "custom_08_code": "Numeric 08 field code stored in the PM report for this custom column.",
     "generate_pdfs": "When checked, generates downloadable PDF reports alongside the terminal output.",
     "output_dir": "Folder where generated PDF reports and output files are saved.",
-    "blacklist": "Comma-separated or newline-separated serial numbers to skip during processing.",
+    "blacklist": "Serial numbers to skip during processing. Use Add/Remove to manage the list. Supports glob-style wildcards (e.g. ABC*).",
     "unpack_min_age": "Skip serials unpacked more recently than this many months ago.",
     "unpack_max_age": "Skip serials unpacked more than this many months ago.",
 }
@@ -1377,8 +1381,63 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         cb_gen_pdfs.toggled.connect(sp_top.setEnabled)
         sp_top.setEnabled(cfg.generate_pdfs)
 
-        bl_edit = QPlainTextEdit(dlg); bl_edit.setObjectName("MainEditor"); bl_edit.setFixedHeight(72)
-        bl_edit.setPlainText("\n".join(cfg.blacklist or []))
+        bl_table = QTableWidget(0, 1, dlg)
+        bl_table.setObjectName("BlacklistTable")
+        bl_table.setHorizontalHeaderLabels(["Serial Number"])
+        bl_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        bl_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        bl_table.verticalHeader().setVisible(False)
+        bl_table.horizontalHeader().setStretchLastSection(True)
+        bl_table.setAlternatingRowColors(True)
+        bl_table.setMinimumHeight(130)
+
+        # Apply corner roundness directly to header sections (CSS :first/:last cascade
+        # is unreliable in Qt for single-column tables)
+        corner_strength = int(QSettings().value(CORNER_ROUNDNESS_KEY, CORNER_ROUNDNESS_DEFAULT, int))
+        bl_radius = _scaled_radius(RADIUS_LG, _corner_scale(corner_strength))
+        bl_table.setStyleSheet(
+            f"QHeaderView {{"
+            f"  background: transparent;"
+            f"  border-top-left-radius: {bl_radius}px;"
+            f"  border-top-right-radius: {bl_radius}px;"
+            f"}}"
+            f"QHeaderView::section {{"
+            f"  border-top-left-radius: {bl_radius}px;"
+            f"  border-top-right-radius: {bl_radius}px;"
+            f"}}"
+            f"QTableCornerButton::section {{"
+            f"  border-top-left-radius: {bl_radius}px;"
+            f"}}"
+            f"QTableWidget QLineEdit {{"
+            f"  padding: 2px 4px;"
+            f"  border: none;"
+            f"  border-radius: 0px;"
+            f"}}"
+        )
+
+        for serial in (cfg.blacklist or []):
+            row = bl_table.rowCount()
+            bl_table.insertRow(row)
+            bl_table.setItem(row, 0, QTableWidgetItem(serial))
+
+        def _add_blacklist_row():
+            row = bl_table.rowCount()
+            bl_table.insertRow(row)
+            bl_table.setItem(row, 0, QTableWidgetItem(""))
+            bl_table.editItem(bl_table.item(row, 0))
+            bl_table.scrollToBottom()
+
+        def _remove_blacklist_rows():
+            rows = sorted({idx.row() for idx in bl_table.selectedIndexes()}, reverse=True)
+            for row in rows:
+                bl_table.removeRow(row)
+
+        btn_add_bl = QPushButton("+ Add", dlg)
+        btn_add_bl.setFixedSize(80, 30)
+        btn_add_bl.clicked.connect(_add_blacklist_row)
+        btn_rem_bl = QPushButton("\u2212 Remove", dlg)
+        btn_rem_bl.setFixedSize(100, 30)
+        btn_rem_bl.clicked.connect(_remove_blacklist_rows)
         
         # --- Date Filters (Max Age / Min Age) ---
         
@@ -1411,7 +1470,15 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         sp_cust_code.setRange(0, 999999); sp_cust_code.setValue(cfg.custom_08_code)
 
         def _save():
-            bl = [l.strip().upper() for l in re.split(r"[\n,]+", bl_edit.toPlainText()) if l.strip()]
+            bl = []
+            seen = set()
+            for r in range(bl_table.rowCount()):
+                item = bl_table.item(r, 0)
+                if item:
+                    val = item.text().strip().upper()
+                    if val and val not in seen:
+                        bl.append(val)
+                        seen.add(val)
             self._save_bulk_config(BulkConfig(
                 top_n=sp_top.value(), out_dir=ed_dir.text().strip(), 
                 pool_size=sp_pool.value(), blacklist=bl,
@@ -1511,7 +1578,14 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         brl.addWidget(_info_badge(bl_row, "blacklist"))
         brl.addStretch(1)
         output_layout.addWidget(bl_row)
-        output_layout.addWidget(bl_edit)
+        output_layout.addWidget(bl_table)
+        bl_btn_row = QHBoxLayout()
+        bl_btn_row.setContentsMargins(0, 0, 0, 0)
+        bl_btn_row.setSpacing(8)
+        bl_btn_row.addWidget(btn_add_bl)
+        bl_btn_row.addWidget(btn_rem_bl)
+        bl_btn_row.addStretch(1)
+        output_layout.addLayout(bl_btn_row)
         l.addWidget(output_section)
 
         filters_section, filters_layout = _section("Unpack Date Filters")

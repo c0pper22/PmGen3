@@ -186,6 +186,32 @@ def test_mainwindow_bulk_config_defaults_machine_filter_to_both(mock_main_window
     assert loaded_cfg.machine_filter == "both"
 
 
+def test_mainwindow_bulk_config_blacklist_roundtrip(mock_main_window):
+    """Blacklist entries should round-trip correctly through save/load."""
+    window = mock_main_window
+
+    cfg = BulkConfig(
+        blacklist=["ABC123", "XYZ789", "QWE*"],
+        machine_filter="both",
+    )
+    window._save_bulk_config(cfg)
+    loaded_cfg = window._get_bulk_config()
+
+    assert loaded_cfg.blacklist == ["ABC123", "XYZ789", "QWE*"]
+    assert len(loaded_cfg.blacklist) == 3
+
+
+def test_mainwindow_bulk_config_blacklist_empty(mock_main_window):
+    """Empty blacklist should save and load as empty list."""
+    window = mock_main_window
+
+    cfg = BulkConfig(blacklist=[], machine_filter="both")
+    window._save_bulk_config(cfg)
+    loaded_cfg = window._get_bulk_config()
+
+    assert loaded_cfg.blacklist == []
+
+
 def test_bulk_settings_tooltip_keys_are_complete():
     """Every bulk setting has a corresponding tooltip description."""
     from pmgen.ui.main_window import BULK_SETTINGS_TOOLTIPS
