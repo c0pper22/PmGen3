@@ -43,7 +43,7 @@ COLOR_SECONDARY_CONTAINER = "#d4e0f8"
 COLOR_ON_SECONDARY_CONTAINER = "#576377"
 
 # Tertiary
-COLOR_TERTIARY = "#5c007b"
+COLOR_TERTIARY = "#dd63ff"
 COLOR_ON_TERTIARY = "#ffffff"
 COLOR_TERTIARY_CONTAINER = "#a33500"
 COLOR_ON_TERTIARY_CONTAINER = "#ffc6b2"
@@ -68,7 +68,7 @@ DARK_OUTLINE = "#4A505C"
 DARK_ON_SURFACE = "#F1F3F5"
 DARK_ON_SURFACE_VARIANT = "#A7ADB7"
 DARK_PRIMARY = "#b2c5ff"
-DARK_PRIMARY_CONTAINER = "#0040a2" # ACCENT COLOR
+DARK_PRIMARY_CONTAINER = "#0066ff" # ACCENT COLOR
 
 # Semantic colors
 COLOR_SUCCESS = "#1e7d4a"
@@ -235,11 +235,12 @@ def _qss(
     spin_down_arrow_url = spin_down_arrow.as_posix()
     # Pre-compute rgba variants used by BasisToggle / ThresholdToggle
     primary_rgba_12 = _hex_to_rgba(primary, 0.12)
-    primary_rgba_22 = _hex_to_rgba(primary, 0.22)
+    primary_rgba_22 = _hex_to_rgba(primary, 0.32)
     primary_rgba_40 = _hex_to_rgba(primary, 0.40)
     primary_rgba_65 = _hex_to_rgba(primary, 0.65)
     tertiary_rgba_12 = _hex_to_rgba(tertiary, 0.12)
-    tertiary_rgba_22 = _hex_to_rgba(tertiary, 0.22)
+
+    tertiary_rgba_22 = _hex_to_rgba(tertiary, 0.32)
     tertiary_rgba_40 = _hex_to_rgba(tertiary, 0.40)
     tertiary_rgba_65 = _hex_to_rgba(tertiary, 0.65)
     return f"""
@@ -364,7 +365,7 @@ QPushButton:disabled {{
     border-color: {subtle_border};
 }}
 QPushButton#BasisToggle {{
-    color: {primary};
+    color: {text};
     background: {primary_rgba_12};
     border: 1px solid {primary_rgba_40};
     border-radius: {radius_badge}px;
@@ -377,7 +378,7 @@ QPushButton#BasisToggle:hover {{
     border-color: {primary_rgba_65};
 }}
 QPushButton#BasisToggle[basis="drive"] {{
-    color: {tertiary};
+    color: {text};
     background: {tertiary_rgba_12};
     border-color: {tertiary_rgba_40};
 }}
