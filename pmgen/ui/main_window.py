@@ -596,7 +596,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         generate_shortcut.activated.connect(self._on_generate_clicked)
 
         self._update_auth_ui()
-        QTimer.singleShot(750, self._attempt_auto_login)
+        QTimer.singleShot(500, self._attempt_auto_login)
 
         QTimer.singleShot(1500, lambda: self._start_update_check(silent=True))
 
