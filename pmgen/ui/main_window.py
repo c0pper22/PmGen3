@@ -482,6 +482,19 @@ from .bulk_run import BulkRunTab, BulkSortFilterProxyModel
 #  MAIN WINDOW
 # =============================================================================
 
+BULK_SETTINGS_TOOLTIPS = {
+    "top_n": "Number of PDF reports to generate. Only the top N serials ranked by usage percentage are included. Final Reports will be affected.",
+    "pool_size": "Number of parallel report generators. Higher can be faster but uses more CPU, and can also encounter memory thrashing and other perfomance issues when set too high. Recommended: 4-8 for most users.",
+    "machine_filter": "Choose which serials to process: active, inactive, or both.",
+    "custom_08_name": "Optional label for an extra tracking column (e.g. Total Pages). Leave empty to disable.",
+    "custom_08_code": "Numeric 08 field code stored in the PM report for this custom column.",
+    "generate_pdfs": "When checked, generates downloadable PDF reports alongside the terminal output.",
+    "output_dir": "Folder where generated PDF reports and output files are saved.",
+    "blacklist": "Comma-separated or newline-separated serial numbers to skip during processing.",
+    "unpack_min_age": "Skip serials unpacked more recently than this many months ago.",
+    "unpack_max_age": "Skip serials unpacked more than this many months ago.",
+}
+
 class MainWindow(WindowResizeMixin, QMainWindow):
     # ---- PM settings Keys ----
     THRESH_KEY = "pm/due_threshold"
@@ -1258,6 +1271,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         dlg._content_layout.addLayout(row)
         dlg.exec()
 
+
     @safe_slot
     def _open_bulk_settings(self, *args):
         cfg = self._get_bulk_config()
@@ -1283,18 +1297,41 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             label.setObjectName("DialogFormLabel")
             return label
 
+        def _info_badge(parent: QWidget, key: str) -> QLabel:
+            badge = QLabel("\u24d8", parent)
+            badge.setToolTip(BULK_SETTINGS_TOOLTIPS.get(key, ""))
+            badge.setProperty("class", "muted")
+            badge.setCursor(Qt.CursorShape.WhatsThisCursor)
+            badge.setFixedWidth(14)
+            return badge
+
+        def _info_container(parent: QWidget) -> QWidget:
+            """Transparent container for label + info badge rows."""
+            w = QWidget(parent)
+            w.setProperty("class", "info-row")
+            return w
+
         def _set_field_width(widget, width=140):
             widget.setMinimumWidth(width)
             widget.setMaximumWidth(width)
             widget.setMinimumHeight(34)
             return widget
 
-        def _grid_row(grid: QGridLayout, row: int, label: str, widget, parent: QWidget):
-            grid.addWidget(_form_label(label, parent), row, 0, Qt.AlignmentFlag.AlignVCenter)
+        def _grid_row(grid: QGridLayout, row: int, label: str, widget, parent: QWidget, tooltip_key: str = ""):
+            if tooltip_key:
+                container = _info_container(parent)
+                h = QHBoxLayout(container)
+                h.setContentsMargins(0, 0, 0, 0)
+                h.setSpacing(2)
+                h.addWidget(_form_label(label, container))
+                h.addWidget(_info_badge(container, tooltip_key))
+                h.addStretch(1)
+                grid.addWidget(container, row, 0, Qt.AlignmentFlag.AlignVCenter)
+            else:
+                grid.addWidget(_form_label(label, parent), row, 0, Qt.AlignmentFlag.AlignVCenter)
             grid.addWidget(widget, row, 1, Qt.AlignmentFlag.AlignRight)
         
         # --- Standard Config ---
-        sp_top = _set_field_width(QSpinBox(dlg), 180); sp_top.setObjectName("DialogInput"); sp_top.setRange(1, 9999); sp_top.setValue(cfg.top_n)
         sp_pool = _set_field_width(QSpinBox(dlg), 180); sp_pool.setObjectName("DialogInput"); sp_pool.setRange(1, 16); sp_pool.setValue(cfg.pool_size)
         machine_box = QComboBox(dlg); machine_box.setObjectName("DialogInput")
         for label, value in (("Both", "both"), ("Active", "active"), ("Inactive", "inactive")):
@@ -1321,6 +1358,11 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             btn_br.setEnabled(checked)
         cb_gen_pdfs.toggled.connect(toggle_out_dir)
         toggle_out_dir(cfg.generate_pdfs)
+
+        sp_top = _set_field_width(QSpinBox(dlg), 96); sp_top.setObjectName("DialogInput")
+        sp_top.setRange(1, 9999); sp_top.setValue(cfg.top_n)
+        cb_gen_pdfs.toggled.connect(sp_top.setEnabled)
+        sp_top.setEnabled(cfg.generate_pdfs)
 
         bl_edit = QPlainTextEdit(dlg); bl_edit.setObjectName("MainEditor"); bl_edit.setFixedHeight(72)
         bl_edit.setPlainText("\n".join(cfg.blacklist or []))
@@ -1387,9 +1429,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         general_grid.setHorizontalSpacing(16)
         general_grid.setVerticalSpacing(8)
         general_grid.setColumnStretch(0, 1)
-        _grid_row(general_grid, 0, "Top N serials", sp_top, general_section)
-        _grid_row(general_grid, 1, "Parallel workers", sp_pool, general_section)
-        _grid_row(general_grid, 2, "Machine filter", machine_box, general_section)
+        _grid_row(general_grid, 0, "Parallel workers", sp_pool, general_section, "pool_size")
+        _grid_row(general_grid, 1, "Machine filter", machine_box, general_section, "machine_filter")
         general_layout.addLayout(general_grid)
 
         custom_section, custom_layout = _section("Custom 08 Tracking")
@@ -1398,9 +1439,16 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         custom_grid.setHorizontalSpacing(16)
         custom_grid.setVerticalSpacing(8)
         custom_grid.setColumnStretch(0, 1)
-        custom_grid.addWidget(_form_label("Column name", custom_section), 0, 0, Qt.AlignmentFlag.AlignVCenter)
+        col_name_row = _info_container(custom_section)
+        cnr = QHBoxLayout(col_name_row)
+        cnr.setContentsMargins(0, 0, 0, 0)
+        cnr.setSpacing(2)
+        cnr.addWidget(_form_label("Column name", col_name_row))
+        cnr.addWidget(_info_badge(col_name_row, "custom_08_name"))
+        cnr.addStretch(1)
+        custom_grid.addWidget(col_name_row, 0, 0, Qt.AlignmentFlag.AlignVCenter)
         custom_grid.addWidget(cb_cust_name, 0, 1)
-        _grid_row(custom_grid, 1, "08 code", sp_cust_code, custom_section)
+        _grid_row(custom_grid, 1, "08 code", sp_cust_code, custom_section, "custom_08_code")
         custom_layout.addLayout(custom_grid)
 
         top_sections = QHBoxLayout()
@@ -1411,15 +1459,45 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         l.addLayout(top_sections)
 
         output_section, output_layout = _section("Output")
-        output_layout.addWidget(cb_gen_pdfs)
+        pdf_row = _info_container(output_section)
+        pr = QHBoxLayout(pdf_row)
+        pr.setContentsMargins(0, 0, 0, 0)
+        pr.setSpacing(2)
+        pr.addWidget(cb_gen_pdfs)
+        pr.addWidget(_info_badge(output_section, "generate_pdfs"))
+        pr.addStretch(1)
+        output_layout.addWidget(pdf_row)
+        reports_row = _info_container(output_section)
+        rr = QHBoxLayout(reports_row)
+        rr.setContentsMargins(0, 0, 0, 0)
+        rr.setSpacing(8)
+        rr.addWidget(_form_label("# of Reports", reports_row))
+        rr.addWidget(_info_badge(reports_row, "top_n"))
+        rr.addStretch(1)
+        rr.addWidget(sp_top)
+        output_layout.addWidget(reports_row)
         r_dir = QHBoxLayout()
         r_dir.setContentsMargins(0, 0, 0, 0)
         r_dir.setSpacing(8)
         r_dir.addWidget(ed_dir, 1)
         r_dir.addWidget(btn_br)
-        output_layout.addWidget(_form_label("Output directory", output_section))
+        od_row = _info_container(output_section)
+        odl = QHBoxLayout(od_row)
+        odl.setContentsMargins(0, 0, 0, 0)
+        odl.setSpacing(2)
+        odl.addWidget(_form_label("Output directory", od_row))
+        odl.addWidget(_info_badge(od_row, "output_dir"))
+        odl.addStretch(1)
+        output_layout.addWidget(od_row)
         output_layout.addLayout(r_dir)
-        output_layout.addWidget(_form_label("Blacklist", output_section))
+        bl_row = _info_container(output_section)
+        brl = QHBoxLayout(bl_row)
+        brl.setContentsMargins(0, 0, 0, 0)
+        brl.setSpacing(2)
+        brl.addWidget(_form_label("Blacklist", bl_row))
+        brl.addWidget(_info_badge(bl_row, "blacklist"))
+        brl.addStretch(1)
+        output_layout.addWidget(bl_row)
         output_layout.addWidget(bl_edit)
         l.addWidget(output_section)
 
@@ -1429,10 +1507,24 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         filters_grid.setHorizontalSpacing(8)
         filters_grid.setVerticalSpacing(8)
         filters_grid.setColumnStretch(0, 1)
-        filters_grid.addWidget(cb_min_age, 0, 0)
+        min_row = _info_container(filters_section)
+        mnr = QHBoxLayout(min_row)
+        mnr.setContentsMargins(0, 0, 0, 0)
+        mnr.setSpacing(2)
+        mnr.addWidget(cb_min_age)
+        mnr.addWidget(_info_badge(filters_section, "unpack_min_age"))
+        mnr.addStretch(1)
+        filters_grid.addWidget(min_row, 0, 0)
         filters_grid.addWidget(sp_min_age, 0, 1)
         filters_grid.addWidget(QLabel("months", filters_section), 0, 2)
-        filters_grid.addWidget(cb_max_age, 1, 0)
+        max_row = _info_container(filters_section)
+        mxr = QHBoxLayout(max_row)
+        mxr.setContentsMargins(0, 0, 0, 0)
+        mxr.setSpacing(2)
+        mxr.addWidget(cb_max_age)
+        mxr.addWidget(_info_badge(filters_section, "unpack_max_age"))
+        mxr.addStretch(1)
+        filters_grid.addWidget(max_row, 1, 0)
         filters_grid.addWidget(sp_max_age, 1, 1)
         filters_grid.addWidget(QLabel("months", filters_section), 1, 2)
         filters_layout.addLayout(filters_grid)

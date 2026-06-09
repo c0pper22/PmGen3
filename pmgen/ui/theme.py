@@ -258,6 +258,7 @@ QMainWindow, QDialog, QWidget {{
 }}
 
 QLabel {{ color: {text}; background: transparent; }}
+QWidget[class="info-row"] {{ background: transparent; }}
 QLabel[class="muted"], QLabel#DialogLabel {{ color: {muted}; }}
 QLabel[class="success-label"] {{ color: {COLOR_SUCCESS}; font-weight: 700; }}
 QLabel[class="status-chip"] {{

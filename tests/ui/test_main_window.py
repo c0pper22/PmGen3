@@ -185,6 +185,21 @@ def test_mainwindow_bulk_config_defaults_machine_filter_to_both(mock_main_window
 
     assert loaded_cfg.machine_filter == "both"
 
+
+def test_bulk_settings_tooltip_keys_are_complete():
+    """Every bulk setting has a corresponding tooltip description."""
+    from pmgen.ui.main_window import BULK_SETTINGS_TOOLTIPS
+
+    expected = {
+        "top_n", "pool_size", "machine_filter",
+        "custom_08_name", "custom_08_code",
+        "generate_pdfs", "output_dir", "blacklist",
+        "unpack_min_age", "unpack_max_age",
+    }
+    assert set(BULK_SETTINGS_TOOLTIPS.keys()) == expected
+    assert all(isinstance(v, str) and len(v) > 10 for v in BULK_SETTINGS_TOOLTIPS.values())
+
+
 def test_mainwindow_tab_close_protection(mock_main_window, monkeypatch):
     """Test that the Home and Inventory tabs cannot be closed."""
     window = mock_main_window
