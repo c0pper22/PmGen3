@@ -1465,7 +1465,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         # --- Custom 08 Filters ---
         cb_cust_name = QLineEdit(cfg.custom_08_name, dlg); cb_cust_name.setObjectName("DialogInput")
         cb_cust_name.setMinimumHeight(34)
-        cb_cust_name.setPlaceholderText("Column Name (e.g. Total Pages)")
+        cb_cust_name.setPlaceholderText("Leave Empty to disable")
         sp_cust_code = _set_field_width(QSpinBox(dlg), 180); sp_cust_code.setObjectName("DialogInput")
         sp_cust_code.setRange(0, 999999); sp_cust_code.setValue(cfg.custom_08_code)
 
