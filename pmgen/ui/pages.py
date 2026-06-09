@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
-from PyQt6.QtWidgets import QPlainTextEdit, QTabBar, QTabWidget, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QPlainTextEdit, QPushButton, QTabBar, QTabWidget, QVBoxLayout, QWidget
 
 from .factory import UIFactory
+from .icons import set_themed_icon
 from .inventory import InventoryTab
 from .theme import SPACING_MD, SPACING_SM
 
@@ -54,7 +56,21 @@ class DashboardTabs(QTabWidget):
         self.setDocumentMode(True)
         self.setTabsClosable(True)
 
+    def tabInserted(self, index: int) -> None:
+        super().tabInserted(index)
+        btn = QPushButton(self)
+        btn.setFixedSize(18, 18)
+        btn.setFlat(True)
+        btn.setProperty("class", "tab-close")
+        btn.clicked.connect(lambda _checked=False, i=index: self.tabCloseRequested.emit(i))
+        set_themed_icon(btn, "exit", _icon_dir())
+        self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, btn)
+
     def add_pinned_tab(self, widget: QWidget, title: str) -> int:
         index = self.addTab(widget, title)
         self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
         return index
+
+
+def _icon_dir() -> str:
+    return str(Path(__file__).resolve().parents[1] / "assets" / "icons")

@@ -610,7 +610,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             return
             
         if isinstance(widget, BulkRunTab):
-            # Check if running
             if widget._is_running:
                 res = CustomMessageBox.confirm(
                     self, "Job Running", 
@@ -619,9 +618,23 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                 )
                 if res != "ok": return
                 widget.stop()
+                # Defer removal until the thread actually finishes
+                widget.finished.connect(lambda w=widget: self._cleanup_bulk_tab(w))
+                return
             
+        self._safe_remove_tab(index)
+
+    def _safe_remove_tab(self, index):
+        widget = self.tabs.widget(index)
+        if widget is not None:
             self.tabs.removeTab(index)
             widget.deleteLater()
+
+    def _cleanup_bulk_tab(self, widget):
+        idx = self.tabs.indexOf(widget)
+        if idx >= 0:
+            self.tabs.removeTab(idx)
+        widget.deleteLater()
 
     # =========================================================================
     #  Settings Management
