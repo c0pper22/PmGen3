@@ -45,7 +45,7 @@ def test_saved_light_mode_and_toggle(qtbot):
 
 def test_qss_bodies_do_not_define_raw_hex_literals():
     source = open(theme.__file__, encoding="utf-8").read()
-    qss_source = source[source.index("def _qss("):source.index("LIGHT_QSS = _qss")]
+    qss_source = source[source.index("def _qss("):source.index("def _radii_for_strength")]
 
     assert not re.search(r"#[0-9A-Fa-f]{3,6}", qss_source)
 

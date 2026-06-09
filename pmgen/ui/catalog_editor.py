@@ -1142,6 +1142,7 @@ class CatalogEditorWindow(WindowResizeMixin, QMainWindow):
                 on_close=self._confirm_close,
             ),
         )
+        top_bar.setProperty("rounded", True)
         layout.addWidget(top_bar, 0)
 
         content = QWidget(self)

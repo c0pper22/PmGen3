@@ -292,6 +292,11 @@ QToolBar {{
 #TopBarBg {{
     background: {surface};
     border-bottom: 1px solid {border};
+    border-top-left-radius: {radius_lg}px;
+    border-top-right-radius: {radius_lg}px;
+}}
+#TopBarBg[rounded="true"] {{
+    border-radius: {radius_lg}px;
 }}
 #TopBarNav, #TopBarControls, #TopBarDragRegion {{
     background: transparent;
@@ -489,6 +494,14 @@ QCheckBox::indicator {{
     background: {surface_low};
 }}
 QCheckBox::indicator:checked {{ background: {primary}; border-color: {primary}; }}
+QAbstractItemView::indicator {{
+    width: 16px;
+    height: 16px;
+    border: 1px solid {subtle_border};
+    border-radius: {radius_sm}px;
+    background: {surface_low};
+}}
+QAbstractItemView::indicator:checked {{ background: {primary}; border-color: {primary}; }}
 QSlider#ThresholdSlider::groove:horizontal {{
     border: 1px solid {subtle_border};
     background: {surface_high};
@@ -528,6 +541,7 @@ QTabWidget::pane {{
 }}
 QTabBar {{
     qproperty-drawBase: 0;
+    background: transparent;
 }}
 QTabBar::tab {{
     background: {surface};
