@@ -153,6 +153,11 @@ def _scrollbar_radius(scale: float) -> int:
     return min(_scaled_radius(RADIUS_DEFAULT, scale), 6)
 
 
+def _progress_bar_radius(scale: float) -> int:
+    # Progress bar is 12 px tall; cap at half-height for pill shape.
+    return min(_scaled_radius(RADIUS_DEFAULT, scale), 6)
+
+
 OUTPUT_HIGHLIGHT_COLORS = {
     "normal": COLOR_ON_PRIMARY,
     "muted": DARK_ON_SURFACE_VARIANT,
@@ -229,6 +234,7 @@ def _qss(
     radius_badge: int,
     radius_full: int,
     radius_scrollbar: int,
+    radius_progress_bar: int,
 ) -> str:
     combo_arrow_url = combo_arrow.as_posix()
     spin_up_arrow_url = spin_up_arrow.as_posix()
@@ -504,11 +510,11 @@ QProgressBar#ProgressBar {{
     background: {surface_high};
     color: {text};
     text-align: center;
-    border-radius: {radius_full}px;
+    border-radius: {radius_progress_bar}px;
 }}
 QProgressBar#ProgressBar::chunk {{
     background-color: {primary};
-    border-radius: {radius_full}px;
+    border-radius: {radius_progress_bar}px;
 }}
 
 QTabWidget::pane {{
@@ -739,7 +745,7 @@ QDialog#FramelessDialogRoot {{
 """
 
 
-def _radii_for_strength(corner_strength: int) -> tuple[int, int, int, int, int, int, int]:
+def _radii_for_strength(corner_strength: int) -> tuple[int, int, int, int, int, int, int, int]:
     scale = _corner_scale(corner_strength)
     return (
         _scaled_radius(RADIUS_SM, scale),
@@ -749,11 +755,12 @@ def _radii_for_strength(corner_strength: int) -> tuple[int, int, int, int, int, 
         _badge_radius(scale),
         _scaled_radius(RADIUS_FULL, scale),
         _scrollbar_radius(scale),
+        _progress_bar_radius(scale),
     )
 
 
 def _build_light_qss(corner_strength: int) -> str:
-    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full, radius_scrollbar = _radii_for_strength(corner_strength)
+    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full, radius_scrollbar, radius_progress_bar = _radii_for_strength(corner_strength)
     return _qss(
         bg=COLOR_BACKGROUND,
         surface=COLOR_SURFACE_LOWEST,
@@ -779,11 +786,12 @@ def _build_light_qss(corner_strength: int) -> str:
         radius_badge=radius_badge,
         radius_full=radius_full,
         radius_scrollbar=radius_scrollbar,
+        radius_progress_bar=radius_progress_bar,
     )
 
 
 def _build_dark_qss(corner_strength: int) -> str:
-    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full, radius_scrollbar = _radii_for_strength(corner_strength)
+    radius_sm, radius_default, radius_lg, radius_popup, radius_badge, radius_full, radius_scrollbar, radius_progress_bar = _radii_for_strength(corner_strength)
     return _qss(
         bg=DARK_BACKGROUND,
         surface=DARK_SURFACE,
@@ -809,6 +817,7 @@ def _build_dark_qss(corner_strength: int) -> str:
         radius_badge=radius_badge,
         radius_full=radius_full,
         radius_scrollbar=radius_scrollbar,
+        radius_progress_bar=radius_progress_bar,
     )
 
 
