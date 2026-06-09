@@ -249,6 +249,7 @@ def _qss(
     tertiary_rgba_22 = _hex_to_rgba(tertiary, 0.32)
     tertiary_rgba_40 = _hex_to_rgba(tertiary, 0.40)
     tertiary_rgba_65 = _hex_to_rgba(tertiary, 0.65)
+    danger_hover_bg = _hex_to_rgba(danger, 0.12)
     return f"""
 QMainWindow, QDialog, QWidget {{
     background: {bg};
@@ -366,10 +367,18 @@ QPushButton[class="secondary"], QPushButton#BulkExportBtn {{
     background: {surface_low};
     border-color: {subtle_border};
 }}
+QPushButton[class="secondary"]:hover, QPushButton#BulkExportBtn:hover {{
+    background: {surface_high};
+    border-color: {muted};
+}}
 QPushButton[class="danger"], QPushButton#BulkStopBtn {{
     background: {danger_bg};
     border-color: {danger};
     color: {danger};
+}}
+QPushButton[class="danger"]:hover, QPushButton#BulkStopBtn:hover {{
+    background: {danger_hover_bg};
+    border-color: {danger};
 }}
 QPushButton:disabled {{
     color: {muted};

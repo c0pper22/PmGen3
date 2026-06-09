@@ -188,12 +188,14 @@ class BulkRunTab(QWidget):
         self.btn_export.setObjectName("BulkExportBtn")
         self.btn_export.setProperty("class", "secondary")
         self.btn_export.setFixedHeight(32)
+        self.btn_export.setMinimumWidth(80)
         self.btn_export.clicked.connect(self._export_to_excel)
 
         self.btn_stop = QPushButton("Stop", header_card)
         self.btn_stop.setObjectName("BulkStopBtn")
         self.btn_stop.setProperty("class", "danger")
         self.btn_stop.setFixedHeight(32)
+        self.btn_stop.setMinimumWidth(80)
         self.btn_stop.clicked.connect(self.stop)
         self.btn_stop.setEnabled(False)
 
