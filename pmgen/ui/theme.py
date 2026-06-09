@@ -424,6 +424,11 @@ QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox, QList
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QListWidget:focus {{
     border: 2px solid {primary};
 }}
+QSpinBox:disabled, QDoubleSpinBox:disabled {{
+    color: {muted};
+    background: {surface_high};
+    border-color: {subtle_border};
+}}
 QComboBox::drop-down {{
     border-left: 1px solid {subtle_border};
     width: 24px;
@@ -750,6 +755,12 @@ QDialog#FramelessDialogRoot {{
     font-weight: 700;
 }}
 #DialogInput:focus {{ border: 2px solid {primary}; }}
+#DialogInput:disabled {{
+    color: {muted};
+    background: {surface_high};
+    border-color: {subtle_border};
+    font-weight: {TYPO_LABEL_SM[1]};
+}}
 #DialogCheckbox {{ background: transparent; }}
 #UserLabel {{
     background: transparent;

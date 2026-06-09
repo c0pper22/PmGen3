@@ -1339,6 +1339,11 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         sp_min_age = _set_field_width(QSpinBox(dlg), 96); sp_min_age.setObjectName("DialogInput"); sp_min_age.setRange(0, 120)
         sp_min_age.setValue(int(s.value("bulk/unpack_min_months", 0, int)))
 
+        cb_max_age.toggled.connect(sp_max_age.setEnabled)
+        cb_min_age.toggled.connect(sp_min_age.setEnabled)
+        sp_max_age.setEnabled(cb_max_age.isChecked())
+        sp_min_age.setEnabled(cb_min_age.isChecked())
+
         btn_save = QPushButton("Save", dlg)
         btn_save.setProperty("class", "primary")
         btn_save.setFixedSize(120, 40)
