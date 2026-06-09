@@ -208,7 +208,7 @@ class BulkRunTab(QWidget):
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         self.view = QTableView(splitter)
-        self.model = BulkQueueModel(custom_col_name=self.config.custom_08_name)
+        self.model = BulkQueueModel(custom_08_name=self.config.custom_08_name, custom_05_name=self.config.custom_05_name)
         self.proxy_model = BulkSortFilterProxyModel(self)
         self.proxy_model.setSourceModel(self.model)
         self.view.setModel(self.proxy_model)
@@ -331,8 +331,8 @@ class BulkRunTab(QWidget):
         self.progress_bar.setMaximum(total)
         self.progress_bar.setValue(current)
 
-    @pyqtSlot(str, str, str, str, str, str, str)
-    def _on_item_updated(self, serial, status, result, model, unpack_date, custom08_val, machine_status):
+    @pyqtSlot(str, str, str, str, str, str, str, str)
+    def _on_item_updated(self, serial, status, result, model, unpack_date, custom08_val, custom05_val, machine_status):
         customer_name = self.customer_map.get(str(serial).strip().upper(), "")
         found = False
         for row in range(self.model.rowCount()):
@@ -345,6 +345,7 @@ class BulkRunTab(QWidget):
                     unpack_date,
                     customer=customer_name,
                     custom08_val=custom08_val,
+                    custom05_val=custom05_val,
                     machine_status=machine_status,
                 )
                 found = True
@@ -359,6 +360,7 @@ class BulkRunTab(QWidget):
                 unpack_date,
                 customer=customer_name,
                 custom08_val=custom08_val,
+                custom05_val=custom05_val,
                 machine_status=machine_status,
             )
 

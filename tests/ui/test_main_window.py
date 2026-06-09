@@ -106,7 +106,7 @@ def test_bulk_run_tab_uses_normalized_customer_map_for_table(qtbot):
     tab = BulkRunTab(BulkConfig(), {"customer_map": {"inac67890": "Inactive Customer"}})
     qtbot.addWidget(tab)
 
-    tab._on_item_updated("INAC67890", "Queued", "", "Unknown", "", "", "Inactive")
+    tab._on_item_updated("INAC67890", "Queued", "", "Unknown", "", "", "", "Inactive")
 
     assert tab.model._data[0][2] == "Inactive Customer"
     assert tab.model._data[0][3] == "Inactive"
@@ -218,7 +218,8 @@ def test_bulk_settings_tooltip_keys_are_complete():
 
     expected = {
         "top_n", "pool_size", "machine_filter",
-        "custom_08_name", "custom_08_code",
+        "custom_08_name", "custom_08_code", "custom_08_sub",
+        "custom_05_name", "custom_05_code", "custom_05_sub",
         "generate_pdfs", "output_dir", "blacklist",
         "unpack_min_age", "unpack_max_age",
     }

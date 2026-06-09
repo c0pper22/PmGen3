@@ -272,7 +272,7 @@ class BulkRunTab(QWidget):
         self.view = QTableView()
         
         # Create base model
-        self.model = BulkQueueModel(custom_col_name=self.config.custom_08_name)
+        self.model = BulkQueueModel(custom_08_name=self.config.custom_08_name, custom_05_name=self.config.custom_05_name)
         
         # Create Proxy Model for Sorting/Filtering
         self.proxy_model = BulkSortFilterProxyModel(self)
@@ -443,19 +443,19 @@ class BulkRunTab(QWidget):
         self.progress_bar.setMaximum(total)
         self.progress_bar.setValue(current)
 
-    @pyqtSlot(str, str, str, str, str, str, str)
-    def _on_item_updated(self, serial, status, result, model, unpack_date, custom08_val, machine_status):
+    @pyqtSlot(str, str, str, str, str, str, str, str)
+    def _on_item_updated(self, serial, status, result, model, unpack_date, custom08_val, custom05_val, machine_status):
         c_name = self.customer_map.get(str(serial).strip().upper(), "")
         found = False
         for r in range(self.model.rowCount()):
             if self.model.get_serial_at(r) == serial:
-                self.model.update_status(serial, status, result, model, unpack_date, customer=c_name, custom08_val=custom08_val, machine_status=machine_status)
+                self.model.update_status(serial, status, result, model, unpack_date, customer=c_name, custom08_val=custom08_val, custom05_val=custom05_val, machine_status=machine_status)
                 found = True
                 break
         
         if not found:
             self.model.add_item(serial, model, customer=c_name, machine_status=machine_status)
-            self.model.update_status(serial, status, result, model, unpack_date, customer=c_name, custom08_val=custom08_val, machine_status=machine_status)
+            self.model.update_status(serial, status, result, model, unpack_date, customer=c_name, custom08_val=custom08_val, custom05_val=custom05_val, machine_status=machine_status)
             
     @pyqtSlot(str)
     def _on_finished(self, msg):
@@ -492,6 +492,10 @@ BULK_SETTINGS_TOOLTIPS = {
     "machine_filter": "Choose which serials to process: active, inactive, or both.",
     "custom_08_name": "Optional label for an extra tracking column (e.g. Total Pages). Leave empty to disable.",
     "custom_08_code": "Numeric 08 field code stored in the PM report for this custom column.",
+    "custom_08_sub": "Optional sub-code filter. Matches rows where the SUB column equals this value (0 = subcode 0).",
+    "custom_05_name": "Optional label for a 05 adjustment tracking column. Leave empty to disable.",
+    "custom_05_code": "Numeric 05 adjustment field code to look up for this custom column.",
+    "custom_05_sub": "Optional sub-code filter. Matches rows where the SUB column equals this value (0 = subcode 0).",
     "generate_pdfs": "When checked, generates downloadable PDF reports alongside the terminal output.",
     "output_dir": "Folder where generated PDF reports and output files are saved.",
     "blacklist": "Serial numbers to skip during processing. Use Add/Remove to manage the list. Supports glob-style wildcards (e.g. ABC*).",
@@ -671,6 +675,13 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         c_name = s.value("bulk/custom_08_name", "", str)
         try: c_code = int(s.value("bulk/custom_08_code", 0, int))
         except: c_code = 0
+        try: c_sub = int(s.value("bulk/custom_08_sub", 0, int))
+        except: c_sub = 0
+        c05_name = s.value("bulk/custom_05_name", "", str)
+        try: c05_code = int(s.value("bulk/custom_05_code", 0, int))
+        except: c05_code = 0
+        try: c05_sub = int(s.value("bulk/custom_05_sub", 0, int))
+        except: c05_sub = 0
         
         gen_pdfs = bool(s.value("bulk/generate_pdfs", True, bool))
         machine_filter = s.value(BULK_MACHINE_FILTER_KEY, "both", str)
@@ -682,6 +693,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             blacklist=bl, 
             custom_08_name=c_name, 
             custom_08_code=c_code,
+            custom_08_sub=c_sub,
+            custom_05_name=c05_name,
+            custom_05_code=c05_code,
+            custom_05_sub=c05_sub,
             generate_pdfs=gen_pdfs,
             machine_filter=machine_filter
         )
@@ -695,6 +710,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         s.setValue(BULK_BLACKLIST_KEY, "\n".join(cfg.blacklist or []))
         s.setValue("bulk/custom_08_name", cfg.custom_08_name)
         s.setValue("bulk/custom_08_code", cfg.custom_08_code)
+        s.setValue("bulk/custom_08_sub", cfg.custom_08_sub)
+        s.setValue("bulk/custom_05_name", cfg.custom_05_name)
+        s.setValue("bulk/custom_05_code", cfg.custom_05_code)
+        s.setValue("bulk/custom_05_sub", cfg.custom_05_sub)
         s.setValue("bulk/generate_pdfs", bool(cfg.generate_pdfs))
         s.setValue(BULK_MACHINE_FILTER_KEY, cfg.machine_filter)
         s.sync()
@@ -1294,8 +1313,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         cfg = self._get_bulk_config()
         s = QSettings()
         dlg = FramelessDialog(self, "Bulk Settings", self._icon_dir)
-        dlg.setMinimumSize(780, 800)
-        dlg.resize(780, 800)
+        dlg.setMinimumSize(780, 900)
+        dlg.resize(780, 900)
 
         def _section(title: str):
             section = QWidget(dlg)
@@ -1466,8 +1485,19 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         cb_cust_name = QLineEdit(cfg.custom_08_name, dlg); cb_cust_name.setObjectName("DialogInput")
         cb_cust_name.setMinimumHeight(34)
         cb_cust_name.setPlaceholderText("Leave Empty to disable")
-        sp_cust_code = _set_field_width(QSpinBox(dlg), 180); sp_cust_code.setObjectName("DialogInput")
+        sp_cust_code = _set_field_width(QSpinBox(dlg), 120); sp_cust_code.setObjectName("DialogInput")
         sp_cust_code.setRange(0, 999999); sp_cust_code.setValue(cfg.custom_08_code)
+        sp_cust_sub = _set_field_width(QSpinBox(dlg), 120); sp_cust_sub.setObjectName("DialogInput")
+        sp_cust_sub.setRange(0, 999999); sp_cust_sub.setValue(cfg.custom_08_sub)
+
+        # --- Custom 05 Filters ---
+        cb_cust05_name = QLineEdit(cfg.custom_05_name, dlg); cb_cust05_name.setObjectName("DialogInput")
+        cb_cust05_name.setMinimumHeight(34)
+        cb_cust05_name.setPlaceholderText("Leave Empty to disable")
+        sp_cust05_code = _set_field_width(QSpinBox(dlg), 120); sp_cust05_code.setObjectName("DialogInput")
+        sp_cust05_code.setRange(0, 999999); sp_cust05_code.setValue(cfg.custom_05_code)
+        sp_cust05_sub = _set_field_width(QSpinBox(dlg), 120); sp_cust05_sub.setObjectName("DialogInput")
+        sp_cust05_sub.setRange(0, 999999); sp_cust05_sub.setValue(cfg.custom_05_sub)
 
         def _save():
             bl = []
@@ -1483,6 +1513,9 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                 top_n=sp_top.value(), out_dir=ed_dir.text().strip(), 
                 pool_size=sp_pool.value(), blacklist=bl,
                 custom_08_name=cb_cust_name.text().strip(), custom_08_code=sp_cust_code.value(),
+                custom_08_sub=sp_cust_sub.value(),
+                custom_05_name=cb_cust05_name.text().strip(), custom_05_code=sp_cust05_code.value(),
+                custom_05_sub=sp_cust05_sub.value(),
                 generate_pdfs=cb_gen_pdfs.isChecked(),
                 machine_filter=machine_box.currentData() or "both"
             ))
@@ -1529,7 +1562,27 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         custom_grid.addWidget(col_name_row, 0, 0, Qt.AlignmentFlag.AlignVCenter)
         custom_grid.addWidget(cb_cust_name, 0, 1)
         _grid_row(custom_grid, 1, "08 code", sp_cust_code, custom_section, "custom_08_code")
+        _grid_row(custom_grid, 2, "Sub", sp_cust_sub, custom_section, "custom_08_sub")
         custom_layout.addLayout(custom_grid)
+
+        custom05_section, custom05_layout = _section("Custom 05 Tracking")
+        custom05_grid = QGridLayout()
+        custom05_grid.setContentsMargins(0, 0, 0, 0)
+        custom05_grid.setHorizontalSpacing(16)
+        custom05_grid.setVerticalSpacing(8)
+        custom05_grid.setColumnStretch(0, 1)
+        col05_name_row = _info_container(custom05_section)
+        c5nr = QHBoxLayout(col05_name_row)
+        c5nr.setContentsMargins(0, 0, 0, 0)
+        c5nr.setSpacing(2)
+        c5nr.addWidget(_form_label("Column name", col05_name_row))
+        c5nr.addWidget(_info_badge(col05_name_row, "custom_05_name"))
+        c5nr.addStretch(1)
+        custom05_grid.addWidget(col05_name_row, 0, 0, Qt.AlignmentFlag.AlignVCenter)
+        custom05_grid.addWidget(cb_cust05_name, 0, 1)
+        _grid_row(custom05_grid, 1, "05 code", sp_cust05_code, custom05_section, "custom_05_code")
+        _grid_row(custom05_grid, 2, "Sub", sp_cust05_sub, custom05_section, "custom_05_sub")
+        custom05_layout.addLayout(custom05_grid)
 
         top_sections = QHBoxLayout()
         top_sections.setContentsMargins(0, 0, 0, 0)
@@ -1537,6 +1590,13 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         top_sections.addWidget(general_section, 1)
         top_sections.addWidget(custom_section, 1)
         l.addLayout(top_sections)
+
+        mid_sections = QHBoxLayout()
+        mid_sections.setContentsMargins(0, 0, 0, 0)
+        mid_sections.setSpacing(10)
+        mid_sections.addWidget(custom05_section, 1)
+        mid_sections.addStretch(1)
+        l.addLayout(mid_sections)
 
         output_section, output_layout = _section("Output")
         pdf_row = _info_container(output_section)

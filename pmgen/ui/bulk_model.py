@@ -9,30 +9,42 @@ from pmgen.ui.theme import (
 )
 
 class BulkQueueModel(QAbstractTableModel):
-    def __init__(self, custom_col_name="", parent=None):
+    def __init__(self, custom_08_name="", custom_05_name="", parent=None):
         super().__init__(parent)
-        self.has_custom = bool(custom_col_name)
-        
+        self.has_custom_08 = bool(custom_08_name)
+        self.has_custom_05 = bool(custom_05_name)
+
         # Build headers dynamically
         self.headers = ["#", "Serial", "Model", "Customer", "Machine State", "Unpack Date"]
-        if self.has_custom:
-            self.headers.append(custom_col_name)
+        if self.has_custom_08:
+            self.headers.append(custom_08_name)
+        if self.has_custom_05:
+            self.headers.append(custom_05_name)
         self.headers.extend(["Status", "Result"])
-        
-        # Internal Data Structure is strictly: 
-        # [Serial(0), Model(1), Customer(2), MachineState(3), UnpackDate(4), Custom08(5), Status(6), Result(7)]
+
+        # Internal Data Structure:
+        # [Serial(0), Model(1), Customer(2), MachineState(3), UnpackDate(4),
+        #  Custom08(5), Custom05(6), Status(7), Result(8)]
         self._data = []
 
         self.visual_to_internal = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 }
-        
-        if self.has_custom:
-            self.visual_to_internal.update({ 6: 5, 7: 6, 8: 7 })
-            self.status_col = 7
-            self.result_col = 8
-        else:
-            self.visual_to_internal.update({ 6: 6, 7: 7 })
-            self.status_col = 6
-            self.result_col = 7
+
+        col_offset = 6  # visual column 6+
+        int_offset = 5  # internal index 5+
+
+        if self.has_custom_08:
+            self.visual_to_internal[col_offset] = int_offset
+            col_offset += 1
+            int_offset += 1
+        if self.has_custom_05:
+            self.visual_to_internal[col_offset] = int_offset
+            col_offset += 1
+            int_offset += 1
+
+        self.visual_to_internal[col_offset] = int_offset      # Status
+        self.visual_to_internal[col_offset + 1] = int_offset + 1  # Result
+        self.status_col = col_offset
+        self.result_col = col_offset + 1
 
     def rowCount(self, parent=None):
         return len(self._data)
@@ -55,7 +67,8 @@ class BulkQueueModel(QAbstractTableModel):
                 return self._data[row][self.visual_to_internal[col]]
         
         if role == Qt.ItemDataRole.ForegroundRole and col == self.status_col:
-            status = self._data[row][6]
+            status_idx = self.visual_to_internal[self.status_col]
+            status = self._data[row][status_idx]
             if status == "Done": return QBrush(QColor(COLOR_SUCCESS))
             if status == "Failed": return QBrush(QColor(COLOR_ERROR))
             if status == "Processing": return QBrush(QColor(COLOR_PRIMARY_CONTAINER))
@@ -96,10 +109,10 @@ class BulkQueueModel(QAbstractTableModel):
         def sort_key(row_data):
             val = row_data[internal_idx]
             
-            if internal_idx == 6: # Status
+            if internal_idx == self.visual_to_internal[self.status_col]: # Status
                 return status_priority(val)
             
-            if internal_idx == 7: # Result
+            if internal_idx == self.visual_to_internal[self.result_col]: # Result
                 s_val = str(val)
                 if "%" in s_val:
                     return (0, percentage_value(s_val))
@@ -112,20 +125,22 @@ class BulkQueueModel(QAbstractTableModel):
 
     def add_item(self, serial, model="Unknown", customer="", machine_status=""):
         self.beginInsertRows(QModelIndex(), len(self._data), len(self._data))
-        self._data.append([serial, model, customer, machine_status, "", "", "Queued", ""])
+        self._data.append([serial, model, customer, machine_status, "", "", "", "Queued", ""])
         self.endInsertRows()
 
-    def update_status(self, serial, status, result, model=None, unpack_date=None, customer=None, custom08_val=None, machine_status=None):
+    def update_status(self, serial, status, result, model=None, unpack_date=None, customer=None,
+                      custom08_val=None, custom05_val=None, machine_status=None):
         for i, row in enumerate(self._data):
             if row[0] == serial:
-                row[6] = status
-                row[7] = result
-                
+                row[7] = status
+                row[8] = result
+
                 if model and model != "Unknown": row[1] = model
                 if customer: row[2] = customer
                 if machine_status: row[3] = machine_status
                 if unpack_date: row[4] = unpack_date
                 if custom08_val is not None: row[5] = custom08_val
+                if custom05_val is not None: row[6] = custom05_val
 
                 self.dataChanged.emit(self.index(i, 1), self.index(i, self.columnCount() - 1))
                 return

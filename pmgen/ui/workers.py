@@ -4,7 +4,7 @@ import traceback
 from fnmatch import fnmatchcase
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_08_bytes, get_unpacking_date
+from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_08_bytes, _parse_code_from_csv_bytes, get_unpacking_date
 from pmgen.engine.single_report import generate_from_bytes
 from datetime import datetime, date
 import calendar
@@ -59,6 +59,10 @@ class BulkConfig:
     show_all: bool = False
     custom_08_name: str = ""
     custom_08_code: int = 0
+    custom_08_sub: int = 0
+    custom_05_name: str = ""
+    custom_05_code: int = 0
+    custom_05_sub: int = 0
     generate_pdfs: bool = True
     machine_filter: str = "both"
 
@@ -67,12 +71,15 @@ class BulkConfig:
         self.machine_filter = (self.machine_filter or "both").strip().lower()
         if self.machine_filter not in {"active", "inactive", "both"}:
             self.machine_filter = "both"
+        self.custom_08_sub = max(0, int(self.custom_08_sub or 0))
+        self.custom_05_code = max(0, int(self.custom_05_code or 0))
+        self.custom_05_sub = max(0, int(self.custom_05_sub or 0))
 
 class BulkRunner(QObject):
     progress = pyqtSignal(str)
     progress_value = pyqtSignal(int, int)
     finished = pyqtSignal(str)
-    item_updated = pyqtSignal(str, str, str, str, str, str, str)
+    item_updated = pyqtSignal(str, str, str, str, str, str, str, str)
 
     def __init__(self, cfg: BulkConfig, threshold: float, life_basis: str,
                  threshold_enabled: bool = True,
@@ -202,7 +209,7 @@ class BulkRunner(QObject):
 
             for s in serials_to_process:
                 machine_status = serial_status_map.get(s, "")
-                self.item_updated.emit(s, "Queued", "", "Unknown", "", "", machine_status)
+                self.item_updated.emit(s, "Queued", "", "Unknown", "", "", "", machine_status)
 
             if QThread.currentThread().isInterruptionRequested():
                 self.finished.emit("[Info] Stopped.")
@@ -224,7 +231,7 @@ class BulkRunner(QObject):
             # --- WORKER FUNCTION ---
             def work(serial: str):
                 machine_status = serial_status_map.get(serial, "")
-                self.item_updated.emit(serial, "Processing", "...", "", "", "", machine_status)
+                self.item_updated.emit(serial, "Processing", "...", "", "", "", "", machine_status)
                 
                 cust_name = self.customer_map.get(str(serial).strip().upper(), "")
 
@@ -235,13 +242,25 @@ class BulkRunner(QObject):
 
                         unpack_date = None
                         custom08_val = ""
+                        custom05_val = ""
                         try:
                             blob_08 = get_service_file_bytes(serial, "08", sess=sess)
                             unpack_date = _parse_unpacking_date_from_08_bytes(blob_08)
                             if self.cfg.custom_08_code > 0:
-                                custom08_val = _parse_code_from_08_bytes(self.cfg.custom_08_code, blob_08)
+                                custom08_val = _parse_code_from_csv_bytes(
+                                    self.cfg.custom_08_code, self.cfg.custom_08_sub, blob_08)
                                 if not custom08_val:
                                     custom08_val = "N/A"
+                        except Exception:
+                            pass
+
+                        try:
+                            if self.cfg.custom_05_code > 0:
+                                blob_05 = get_service_file_bytes(serial, "05", sess=sess)
+                                custom05_val = _parse_code_from_csv_bytes(
+                                    self.cfg.custom_05_code, self.cfg.custom_05_sub, blob_05)
+                                if not custom05_val:
+                                    custom05_val = "N/A"
                         except Exception:
                             pass
 
@@ -264,7 +283,7 @@ class BulkRunner(QObject):
                     if filter_reason:
                         # FILTERED: Update UI with percentage, but mark as filtered.
                         # We do NOT generate the individual PDF report.
-                        self.item_updated.emit(serial, "Filtered", pct_str, model_name, d_str, custom08_val, machine_status)
+                        self.item_updated.emit(serial, "Filtered", pct_str, model_name, d_str, custom08_val, custom05_val, machine_status)
                         
                         return {
                             "serial": serial,
@@ -281,7 +300,7 @@ class BulkRunner(QObject):
                                 customer_name=cust_name
                             )
 
-                        self.item_updated.emit(serial, "Done", pct_str, model_name, d_str, custom08_val, machine_status)
+                        self.item_updated.emit(serial, "Done", pct_str, model_name, d_str, custom08_val, custom05_val, machine_status)
 
                         return {
                             "serial": (report.headers or {}).get("serial") or serial,
@@ -298,7 +317,7 @@ class BulkRunner(QObject):
                         }
 
                 except Exception as e:
-                    self.item_updated.emit(serial, "Failed", str(e), "", "", "", machine_status)
+                    self.item_updated.emit(serial, "Failed", str(e), "", "", "", "", machine_status)
                     return {"serial": serial, "error": str(e), "trace": traceback.format_exc()}
 
             # --- EXECUTION LOOP ---

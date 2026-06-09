@@ -14,7 +14,7 @@ def test_add_item(qtbot):
     assert model._data[0][0] == "SN123"
     assert model._data[0][1] == "PrinterX"
     assert model._data[0][3] == "Inactive"
-    assert model._data[0][6] == "Queued"
+    assert model._data[0][7] == "Queued"
 
 def test_update_status(qtbot):
     """Test that updating an item modifies the correct indices."""
@@ -30,8 +30,8 @@ def test_update_status(qtbot):
         machine_status="Active"
     )
     
-    assert model._data[0][6] == "Done"
-    assert model._data[0][7] == "95.0%"
+    assert model._data[0][7] == "Done"
+    assert model._data[0][8] == "95.0%"
     assert model._data[0][1] == "PrinterY" 
     assert model._data[0][2] == "CorpB"
     assert model._data[0][3] == "Active"

@@ -382,13 +382,9 @@ def _parse_model_from_08_bytes(blob: bytes) -> str:
         text = blob.decode(errors="ignore")
         for line in text.splitlines():
             if "9486" in line:
-                # Split by comma
                 parts = [p.strip() for p in line.split(",")]
-
-                # Find where 9486 is located
                 if "9486" in parts:
                     idx = parts.index("9486")
-                    # Look for the first non-empty value after the code
                     for candidate in parts[idx+1:]:
                         if candidate:
                             return candidate
@@ -396,107 +392,68 @@ def _parse_model_from_08_bytes(blob: bytes) -> str:
         pass
     return "Unknown"
 
-    def _parse_code_from_08_bytes(code: int, blob: bytes) -> str:
-        """
-        Parses the 08 setting mode data blob and returns the data value for the given code.
-        
-        Args:
-            code (int): The code to search for.
-            blob (bytes): The byte content of the CSV file.
-        Returns:
-            str: The value from the DATA column corresponding to the code.
-                Returns an empty string if the code is not found.
-        """
-        try:
-            text = blob.decode('utf-8')
-        except UnicodeDecodeError:
-            text = blob.decode('latin-1', errors='replace')
-            
-        lines = text.splitlines()
-        
-        target_code_str = str(code)
-        start_processing = False
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-                
-            if line.startswith("CODE,"):
-                start_processing = True
-                continue
-                
-            if not start_processing:
-                continue
-                
-            parts = line.split(',')
-            
-            if len(parts) < 2:
-                continue
-                
-            current_code = parts[0].strip()
-            
-            if current_code == target_code_str:
 
-                if parts[-1].strip() == '':
-                    data_parts = parts[2:-1]
-                else:
-                    data_parts = parts[2:]
-                
-                return ",".join(data_parts).strip()
-                
-        return ""
-    
-def _parse_code_from_08_bytes(code: int, blob: bytes) -> str:
+def _parse_code_from_csv_bytes(code: int, sub: int, blob: bytes) -> str:
     """
-    Parses the 08 setting mode data blob and returns the data value for the given code.
-    
+    Parses a 08/05 CSV blob and returns the DATA value for the given code and sub.
+
+    Expected CSV format:
+        CODE, SUB, DATA,
+        2405, 0, 6199,
+        2405, 1, 6184,
+
     Args:
         code (int): The code to search for.
+        sub (int): The sub-code to filter by. Matches rows where the SUB column
+                   equals this value (0 matches subcode 0). Use -1 to match
+                   any sub.
         blob (bytes): The byte content of the CSV file.
     Returns:
-        str: The value from the DATA column corresponding to the code.
-             Returns an empty string if the code is not found.
+        str: The DATA column value, joined by commas if multiple data columns.
+             Returns empty string if not found.
     """
     try:
         text = blob.decode('utf-8')
     except UnicodeDecodeError:
         text = blob.decode('latin-1', errors='replace')
-        
+
     lines = text.splitlines()
-    
     target_code_str = str(code)
+    target_sub_str = str(sub)
     start_processing = False
-    
+
     for line in lines:
         line = line.strip()
         if not line:
             continue
-            
+
         if line.startswith("CODE,"):
             start_processing = True
             continue
-            
+
         if not start_processing:
             continue
-            
-        parts = line.split(',')
-        
-        if len(parts) < 2:
-            continue
-            
-        current_code = parts[0].strip()
-        
-        if current_code == target_code_str:
 
-            if parts[-1].strip() == '':
-                data_parts = parts[2:-1]
-            else:
-                data_parts = parts[2:]
-            
-            return ",".join(data_parts).strip()
-            
+        parts = line.split(',')
+        if len(parts) < 3:
+            continue
+
+        current_code = parts[0].strip()
+        current_sub = parts[1].strip()
+
+        if current_code != target_code_str:
+            continue
+
+        if sub == -1 or current_sub == target_sub_str:
+            data_parts = parts[2:-1] if parts[-1].strip() == '' else parts[2:]
+            return ",".join(p.strip() for p in data_parts if p.strip())
+
     return ""
+
+
+def _parse_code_from_08_bytes(code: int, blob: bytes) -> str:
+    """Backward-compatible wrapper — matches first occurrence of code regardless of sub."""
+    return _parse_code_from_csv_bytes(code, -1, blob)
 
 def get_device_info_08(serial: str, sess: Optional[requests.Session] = None) -> Dict:
     """
