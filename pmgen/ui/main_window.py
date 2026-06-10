@@ -492,10 +492,10 @@ BULK_SETTINGS_TOOLTIPS = {
     "machine_filter": "Choose which serials to process: active, inactive, or both.",
     "custom_08_name": "Optional label for an extra tracking column (e.g. Total Pages). Leave empty to disable.",
     "custom_08_code": "Numeric 08 field code stored in the PM report for this custom column.",
-    "custom_08_sub": "Optional sub-code filter. Matches rows where the SUB column equals this value (0 = subcode 0).",
+    "custom_08_sub": "Optional sub-code filter. Matches rows with matching SUB value (0 also matches empty sub).",
     "custom_05_name": "Optional label for a 05 adjustment tracking column. Leave empty to disable.",
     "custom_05_code": "Numeric 05 adjustment field code to look up for this custom column.",
-    "custom_05_sub": "Optional sub-code filter. Matches rows where the SUB column equals this value (0 = subcode 0).",
+    "custom_05_sub": "Optional sub-code filter. Matches rows with matching SUB value (0 also matches empty sub).",
     "generate_pdfs": "When checked, generates downloadable PDF reports alongside the terminal output.",
     "output_dir": "Folder where generated PDF reports and output files are saved.",
     "blacklist": "Serial numbers to skip during processing. Use Add/Remove to manage the list. Supports glob-style wildcards (e.g. ABC*).",
@@ -1313,8 +1313,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         cfg = self._get_bulk_config()
         s = QSettings()
         dlg = FramelessDialog(self, "Bulk Settings", self._icon_dir)
-        dlg.setMinimumSize(780, 900)
-        dlg.resize(780, 900)
+        dlg.setMinimumSize(980, 700)
+        dlg.resize(980, 700)
 
         def _section(title: str):
             section = QWidget(dlg)
@@ -1408,7 +1408,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         bl_table.verticalHeader().setVisible(False)
         bl_table.horizontalHeader().setStretchLastSection(True)
         bl_table.setAlternatingRowColors(True)
-        bl_table.setMinimumHeight(130)
+        bl_table.setMinimumHeight(100)
 
         # Apply corner roundness directly to header sections (CSS :first/:last cascade
         # is unreliable in Qt for single-column tables)
@@ -1589,14 +1589,12 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         top_sections.setSpacing(10)
         top_sections.addWidget(general_section, 1)
         top_sections.addWidget(custom_section, 1)
+        top_sections.addWidget(custom05_section, 1)
         l.addLayout(top_sections)
 
-        mid_sections = QHBoxLayout()
-        mid_sections.setContentsMargins(0, 0, 0, 0)
-        mid_sections.setSpacing(10)
-        mid_sections.addWidget(custom05_section, 1)
-        mid_sections.addStretch(1)
-        l.addLayout(mid_sections)
+        bottom_sections = QHBoxLayout()
+        bottom_sections.setContentsMargins(0, 0, 0, 0)
+        bottom_sections.setSpacing(10)
 
         output_section, output_layout = _section("Output")
         pdf_row = _info_container(output_section)
@@ -1646,13 +1644,13 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         bl_btn_row.addWidget(btn_rem_bl)
         bl_btn_row.addStretch(1)
         output_layout.addLayout(bl_btn_row)
-        l.addWidget(output_section)
+        bottom_sections.addWidget(output_section, 1)
 
         filters_section, filters_layout = _section("Unpack Date Filters")
         filters_grid = QGridLayout()
         filters_grid.setContentsMargins(0, 0, 0, 0)
         filters_grid.setHorizontalSpacing(8)
-        filters_grid.setVerticalSpacing(8)
+        filters_grid.setVerticalSpacing(2)
         filters_grid.setColumnStretch(0, 1)
         min_row = _info_container(filters_section)
         mnr = QHBoxLayout(min_row)
@@ -1675,7 +1673,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         filters_grid.addWidget(sp_max_age, 1, 1)
         filters_grid.addWidget(QLabel("months", filters_section), 1, 2)
         filters_layout.addLayout(filters_grid)
-        l.addWidget(filters_section)
+        bottom_sections.addWidget(filters_section, 0, Qt.AlignmentFlag.AlignTop)
+        l.addLayout(bottom_sections)
 
         r_btn = QHBoxLayout()
         r_btn.addStretch(1)

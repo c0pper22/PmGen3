@@ -405,8 +405,8 @@ def _parse_code_from_csv_bytes(code: int, sub: int, blob: bytes) -> str:
     Args:
         code (int): The code to search for.
         sub (int): The sub-code to filter by. Matches rows where the SUB column
-                   equals this value (0 matches subcode 0). Use -1 to match
-                   any sub.
+                   equals this value (0 matches subcode 0 or empty sub).
+                   Use -1 to match any sub.
         blob (bytes): The byte content of the CSV file.
     Returns:
         str: The DATA column value, joined by commas if multiple data columns.
@@ -444,7 +444,13 @@ def _parse_code_from_csv_bytes(code: int, sub: int, blob: bytes) -> str:
         if current_code != target_code_str:
             continue
 
-        if sub == -1 or current_sub == target_sub_str:
+        # sub=-1: match any sub (backward compat). sub=0: match literal "0" OR empty sub.
+        sub_matches = (
+            sub == -1
+            or current_sub == target_sub_str
+            or (sub == 0 and current_sub == "")
+        )
+        if sub_matches:
             data_parts = parts[2:-1] if parts[-1].strip() == '' else parts[2:]
             return ",".join(p.strip() for p in data_parts if p.strip())
 
