@@ -65,6 +65,10 @@ class BulkConfig:
     custom_05_sub: int = 0
     generate_pdfs: bool = True
     machine_filter: str = "both"
+    unpack_filter_enabled: bool = False
+    unpack_extra_months: int = 0
+    unpack_min_filter_enabled: bool = False
+    unpack_min_months: int = 0
 
     def __post_init__(self):
         if self.blacklist is None: self.blacklist = []
@@ -73,6 +77,9 @@ class BulkConfig:
             self.machine_filter = "both"
         self.custom_08_sub = max(0, int(self.custom_08_sub or 0))
         self.custom_05_code = max(0, int(self.custom_05_code or 0))
+        self.custom_05_sub = max(0, int(self.custom_05_sub or 0))
+        self.unpack_extra_months = max(0, min(120, int(self.unpack_extra_months or 0)))
+        self.unpack_min_months = max(0, min(120, int(self.unpack_min_months or 0)))
         self.custom_05_sub = max(0, int(self.custom_05_sub or 0))
 
 class BulkRunner(QObject):

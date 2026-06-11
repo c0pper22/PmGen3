@@ -37,6 +37,15 @@ from .components import (
 )
 from .highlighter import OutputHighlighter
 from .workers import BulkConfig, BulkRunner, SingleReportWorker
+from .profile_store import (
+    DEFAULT_PROFILE_NAME,
+    list_profile_names,
+    load_profile,
+    save_profile,
+    delete_profile,
+    get_last_profile_name,
+    set_last_profile_name,
+)
 from pmgen.io.db_access import CatalogDB
 from pmgen.io.http_client import get_customer_map_after_login
 from pmgen.updater.updater import UpdateWorker, perform_restart, CURRENT_VERSION
@@ -709,6 +718,11 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         gen_pdfs = bool(s.value("bulk/generate_pdfs", True, bool))
         machine_filter = s.value(BULK_MACHINE_FILTER_KEY, "both", str)
 
+        unpack_filter_enabled = bool(s.value("bulk/unpack_filter_enabled", False, bool))
+        unpack_extra_months = int(s.value("bulk/unpack_extra_months", 0, int))
+        unpack_min_filter_enabled = bool(s.value("bulk/unpack_min_filter_enabled", False, bool))
+        unpack_min_months = int(s.value("bulk/unpack_min_months", 0, int))
+
         return BulkConfig(
             top_n=max(1, min(9999, top_n)), 
             out_dir=out, 
@@ -721,7 +735,11 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             custom_05_code=c05_code,
             custom_05_sub=c05_sub,
             generate_pdfs=gen_pdfs,
-            machine_filter=machine_filter
+            machine_filter=machine_filter,
+            unpack_filter_enabled=unpack_filter_enabled,
+            unpack_extra_months=unpack_extra_months,
+            unpack_min_filter_enabled=unpack_min_filter_enabled,
+            unpack_min_months=unpack_min_months,
         )
 
     def _save_bulk_config(self, cfg: BulkConfig):
@@ -739,6 +757,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         s.setValue("bulk/custom_05_sub", cfg.custom_05_sub)
         s.setValue("bulk/generate_pdfs", bool(cfg.generate_pdfs))
         s.setValue(BULK_MACHINE_FILTER_KEY, cfg.machine_filter)
+        s.setValue("bulk/unpack_filter_enabled", bool(cfg.unpack_filter_enabled))
+        s.setValue("bulk/unpack_extra_months", int(cfg.unpack_extra_months))
+        s.setValue("bulk/unpack_min_filter_enabled", bool(cfg.unpack_min_filter_enabled))
+        s.setValue("bulk/unpack_min_months", int(cfg.unpack_min_months))
         s.sync()
 
     def _get_show_all(self) -> bool:
@@ -1550,7 +1572,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         sp_cust05_sub = _set_field_width(QSpinBox(dlg), 120); sp_cust05_sub.setObjectName("DialogInput")
         sp_cust05_sub.setRange(0, 999999); sp_cust05_sub.setValue(cfg.custom_05_sub)
 
-        def _save():
+        def _snapshot_widgets_to_config() -> BulkConfig:
+            """Read all widget values and return a complete BulkConfig."""
             bl = []
             seen = set()
             for r in range(bl_table.rowCount()):
@@ -1560,27 +1583,49 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                     if val and val not in seen:
                         bl.append(val)
                         seen.add(val)
-            self._save_bulk_config(BulkConfig(
-                top_n=sp_top.value(), out_dir=ed_dir.text().strip(), 
+            return BulkConfig(
+                top_n=sp_top.value(), out_dir=ed_dir.text().strip(),
                 pool_size=sp_pool.value(), blacklist=bl,
                 custom_08_name=cb_cust_name.text().strip(), custom_08_code=sp_cust_code.value(),
                 custom_08_sub=sp_cust_sub.value(),
                 custom_05_name=cb_cust05_name.text().strip(), custom_05_code=sp_cust05_code.value(),
                 custom_05_sub=sp_cust05_sub.value(),
                 generate_pdfs=cb_gen_pdfs.isChecked(),
-                machine_filter=machine_box.currentData() or "both"
-            ))
-            
-            
-            # Save Max Age (Existing keys)
-            s.setValue("bulk/unpack_filter_enabled", cb_max_age.isChecked())
-            s.setValue("bulk/unpack_extra_months", sp_max_age.value())
-            
-            # Save Min Age (New keys)
-            s.setValue("bulk/unpack_min_filter_enabled", cb_min_age.isChecked())
-            s.setValue("bulk/unpack_min_months", sp_min_age.value())
-            
+                machine_filter=machine_box.currentData() or "both",
+                unpack_filter_enabled=cb_max_age.isChecked(),
+                unpack_extra_months=sp_max_age.value(),
+                unpack_min_filter_enabled=cb_min_age.isChecked(),
+                unpack_min_months=sp_min_age.value(),
+            )
+
+        def _save():
+            self._save_bulk_config(_snapshot_widgets_to_config())
             dlg.accept()
+
+        def _apply_config_to_widgets(cfg: BulkConfig) -> None:
+            """Set every widget from a BulkConfig (used when loading a profile)."""
+            sp_pool.setValue(cfg.pool_size)
+            idx = machine_box.findData(cfg.machine_filter)
+            machine_box.setCurrentIndex(idx if idx >= 0 else 0)
+            cb_gen_pdfs.setChecked(cfg.generate_pdfs)
+            ed_dir.setText(cfg.out_dir)
+            sp_top.setValue(cfg.top_n)
+            cb_cust_name.setText(cfg.custom_08_name)
+            sp_cust_code.setValue(cfg.custom_08_code)
+            sp_cust_sub.setValue(cfg.custom_08_sub)
+            cb_cust05_name.setText(cfg.custom_05_name)
+            sp_cust05_code.setValue(cfg.custom_05_code)
+            sp_cust05_sub.setValue(cfg.custom_05_sub)
+            cb_max_age.setChecked(cfg.unpack_filter_enabled)
+            sp_max_age.setValue(cfg.unpack_extra_months)
+            cb_min_age.setChecked(cfg.unpack_min_filter_enabled)
+            sp_min_age.setValue(cfg.unpack_min_months)
+            # Rebuild blacklist table
+            bl_table.setRowCount(0)
+            for serial in (cfg.blacklist or []):
+                row = bl_table.rowCount()
+                bl_table.insertRow(row)
+                bl_table.setItem(row, 0, QTableWidgetItem(serial))
 
         btn_save.clicked.connect(_save)
 
@@ -1724,7 +1769,103 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         filters_grid.addWidget(sp_max_age, 1, 1)
         filters_grid.addWidget(QLabel("months", filters_section), 1, 2)
         filters_layout.addLayout(filters_grid)
-        bottom_sections.addWidget(filters_section, 0, Qt.AlignmentFlag.AlignTop)
+
+        # --- Profiles section (fills the empty space below date filters) ---
+        profiles_section, profiles_layout = _section("Profiles")
+
+        profile_combo = QComboBox(dlg)
+        profile_combo.setObjectName("DialogInput")
+        profile_combo.setMinimumHeight(34)
+        profile_combo.setEditable(False)
+
+        btn_profile_save = QPushButton("Save Profile", dlg)
+        btn_profile_save.setFixedSize(110, 30)
+        btn_profile_delete = QPushButton("Delete Profile", dlg)
+        btn_profile_delete.setFixedSize(110, 30)
+
+        profile_btn_row = QHBoxLayout()
+        profile_btn_row.setContentsMargins(0, 0, 0, 0)
+        profile_btn_row.setSpacing(8)
+        profile_btn_row.addWidget(btn_profile_save)
+        profile_btn_row.addWidget(btn_profile_delete)
+        profile_btn_row.addStretch(1)
+
+        profiles_layout.addWidget(profile_combo)
+        profiles_layout.addLayout(profile_btn_row)
+
+        def _repopulate_profiles(select_name: str | None = None):
+            """Refresh combo items and optionally select a specific name."""
+            current = select_name or profile_combo.currentText()
+            if current not in list_profile_names():
+                current = DEFAULT_PROFILE_NAME
+            profile_combo.clear()
+            for name in list_profile_names():
+                profile_combo.addItem(name)
+            idx = profile_combo.findText(current)
+            profile_combo.setCurrentIndex(idx if idx >= 0 else 0)
+            # Explicitly load the selected profile so programmatic changes
+            # (initial open, after save/delete) apply immediately.
+            _on_profile_selected(profile_combo.currentText())
+
+        def _on_profile_selected(name: str):
+            if not name:
+                return
+            cfg_from_profile = load_profile(name)
+            _apply_config_to_widgets(cfg_from_profile)
+            set_last_profile_name(name)
+            # Update the delete button enabled state
+            btn_profile_delete.setEnabled(name != DEFAULT_PROFILE_NAME)
+
+        def _on_save_profile():
+            target_name = profile_combo.currentText()
+            if not target_name or target_name == DEFAULT_PROFILE_NAME:
+                from PyQt6.QtWidgets import QInputDialog
+                new_name, ok = QInputDialog.getText(
+                    dlg, "New Profile", "Profile name:"
+                )
+                if not ok or not new_name.strip():
+                    return
+                target_name = new_name.strip()
+            cfg_snapshot = _snapshot_widgets_to_config()
+            save_profile(target_name, cfg_snapshot)
+            set_last_profile_name(target_name)
+            _repopulate_profiles(select_name=target_name)
+
+        def _on_delete_profile():
+            target_name = profile_combo.currentText()
+            if not target_name or target_name == DEFAULT_PROFILE_NAME:
+                return
+            result = CustomMessageBox.confirm(
+                dlg,
+                "Delete Profile",
+                f"Delete profile \"{target_name}\"?",
+                self._icon_dir,
+            )
+            if result != "ok":
+                return
+            delete_profile(target_name)
+            _repopulate_profiles(select_name=DEFAULT_PROFILE_NAME)
+            set_last_profile_name(DEFAULT_PROFILE_NAME)
+
+        # activated fires on every user dropdown pick, even re-selecting the
+        # already-active item — so a user who tweaked a setting manually can
+        # click the current profile again to revert to its saved values.
+        profile_combo.activated.connect(lambda idx: _on_profile_selected(profile_combo.itemText(idx)))
+        btn_profile_save.clicked.connect(_on_save_profile)
+        btn_profile_delete.clicked.connect(_on_delete_profile)
+
+        # Initial population (triggers _on_profile_selected via _repopulate_profiles)
+        last_profile = get_last_profile_name()
+        _repopulate_profiles(select_name=last_profile)
+
+        # --- Vertical container for Filters + Profiles ---
+        right_column = QVBoxLayout()
+        right_column.setContentsMargins(0, 0, 0, 0)
+        right_column.setSpacing(10)
+        right_column.addWidget(filters_section, 0, Qt.AlignmentFlag.AlignTop)
+        right_column.addWidget(profiles_section, 1)
+        bottom_sections.addLayout(right_column)
+
         l.addLayout(bottom_sections)
 
         r_btn = QHBoxLayout()
