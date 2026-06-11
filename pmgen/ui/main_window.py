@@ -873,14 +873,14 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self._update_worker.error_occurred.connect(self._update_thread.quit)
         
         self._update_thread.finished.connect(self._update_thread.deleteLater)
-        self._update_thread.finished.connect(self._update_thread.deleteLater)
         self._update_thread.finished.connect(self._reset_update_thread)
         
         self._update_thread.start()
 
     @pyqtSlot(bool, str, str)
     def _on_check_finished(self, found, version_tag, url):
-        self._update_thread.quit() # Stop the check thread
+        if self._update_thread is not None:
+            self._update_thread.quit()  # Stop the check thread
         
         if found:
             res = CustomMessageBox.confirm(
@@ -897,7 +897,14 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
     @pyqtSlot(str)
     def _on_update_error(self, msg):
-        self._update_thread.quit()
+        # Errors can come from the check thread OR the download/extract thread.
+        # The check thread may already be gone, so guard every reference.
+        if self._update_thread is not None:
+            self._update_thread.quit()
+        dl_dialog = getattr(self, "_dl_dialog", None)
+        if dl_dialog is not None:
+            dl_dialog.close()
+            self._dl_dialog = None
         if not self._update_silent_mode:
             self.editor.appendPlainText(f"[Update Error] {msg}")
             CustomMessageBox.warn(self, "Update Error", msg, self._icon_dir)
@@ -905,6 +912,14 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     def _start_download(self, url):
         self.editor.appendPlainText("[Update] Starting download...")
         
+        # Drop any connections left over from a previous download attempt so the
+        # start signals only reach the new worker.
+        for sig in (self.sig_start_download, self.sig_start_extract):
+            try:
+                sig.disconnect()
+            except TypeError:
+                pass  # No existing connections.
+
         self._dl_thread = QThread()
         self._dl_worker = UpdateWorker()
         self._dl_worker.moveToThread(self._dl_thread)
@@ -958,10 +973,23 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
     @pyqtSlot(str, str)
     def _on_extraction_complete(self, zip_path, extract_dir):
-        if hasattr(self, "_dl_dialog"):
-            self._dl_dialog.close()
+        dl_dialog = getattr(self, "_dl_dialog", None)
+        if dl_dialog is not None:
+            dl_dialog.close()
+            self._dl_dialog = None
         
-        perform_restart(zip_path, extract_dir)
+        if not perform_restart(zip_path, extract_dir):
+            # Frozen-build failure (non-writable dir, missing/unstageable updater).
+            # In dev (non-frozen) this is the expected no-op path.
+            if getattr(sys, 'frozen', False):
+                CustomMessageBox.warn(
+                    self,
+                    "Update Error",
+                    "The update was downloaded but could not be installed.\n"
+                    "Check that the application folder is writable.\n"
+                    "See the log for details.",
+                    self._icon_dir,
+                )
 
     # =========================================================================
     #  Actions & Logic

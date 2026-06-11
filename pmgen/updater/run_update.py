@@ -99,10 +99,12 @@ def setup_logging() -> None:
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
 
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(console_fmt)
-    console_handler.setLevel(logging.INFO)
-    logger.addHandler(console_handler)
+    # In a windowed (console=False) PyInstaller build, sys.stdout is None.
+    if sys.stdout:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(console_fmt)
+        console_handler.setLevel(logging.INFO)
+        logger.addHandler(console_handler)
 
 
 def _retry_delay(attempt: int) -> float:
@@ -112,6 +114,27 @@ def _retry_delay(attempt: int) -> float:
 def _is_process_running(pid: int) -> bool:
     if pid <= 0:
         return False
+
+    if sys.platform == "win32":
+        # NOTE: os.kill(pid, 0) on Windows calls TerminateProcess — it KILLS the
+        # target instead of probing it. Use OpenProcess/GetExitCodeProcess instead.
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return False
+        try:
+            exit_code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                return True
+            return exit_code.value == STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+
     try:
         os.kill(pid, 0)
         return True
@@ -472,6 +495,19 @@ def _cleanup_session_paths(src_dir_arg: Path) -> None:
             logging.warning(f"Failed to remove temp path {path}: {exc}")
 
 
+def _relaunch_app(dst_dir: Path, target_exe_name: str) -> None:
+    """Best-effort relaunch of the application (new version or rolled-back previous one)."""
+    target_exe_path = dst_dir / target_exe_name
+    if not target_exe_path.exists():
+        logging.error(f"Target executable not found for relaunch: {target_exe_path}")
+        return
+    try:
+        subprocess.Popen([str(target_exe_path)], cwd=str(dst_dir), close_fds=True)
+        logging.info("Relaunch successful.")
+    except Exception as exc:
+        logging.error(f"Failed to relaunch app: {exc}")
+
+
 def main() -> None:
     setup_logging()
     logging.info("=" * 60)
@@ -497,21 +533,31 @@ def main() -> None:
 
     session_id = sys.argv[5] if len(sys.argv) >= 6 and sys.argv[5] else str(int(time.time()))
 
+    # Wait for the parent to exit BEFORE validating, so every failure path below
+    # can safely relaunch the app without creating a duplicate instance.
+    if not wait_for_parent_exit(parent_pid):
+        logging.error("Parent process did not exit within timeout; aborting update.")
+        return
+
     resolved_src_dir = Path(resolve_payload_root(str(src_dir_arg), target_exe_name)).resolve()
     logging.info(f"Resolved payload source directory: {resolved_src_dir}")
 
     payload_ok, payload_msg = validate_payload_root(resolved_src_dir, target_exe_name)
     if not payload_ok:
         logging.error(f"Invalid update payload: {payload_msg}")
-        return
-
-    if not wait_for_parent_exit(parent_pid):
-        logging.error("Parent process did not exit within timeout; aborting update.")
+        _relaunch_app(dst_dir, target_exe_name)
         return
 
     lock_path = None
+    should_relaunch = True
     try:
-        lock_path = acquire_update_lock(dst_dir, session_id)
+        try:
+            lock_path = acquire_update_lock(dst_dir, session_id)
+        except TimeoutError as exc:
+            # Another live updater owns this install; let it handle the relaunch.
+            logging.critical(f"Could not acquire update lock: {exc}")
+            should_relaunch = False
+            return
 
         success = False
         for attempt in range(MAX_RETRIES):
@@ -526,24 +572,14 @@ def main() -> None:
             logging.info(f"Waiting {wait:.2f}s for files to unlock...")
             time.sleep(wait)
 
-        if not success:
-            logging.critical("Timed out waiting for file locks. Update failed.")
-            return
-
-        _cleanup_session_paths(src_dir_arg)
-
-        target_exe_path = dst_dir / target_exe_name
-        logging.info(f"Relaunching application: {target_exe_path}")
-        if target_exe_path.exists():
-            try:
-                subprocess.Popen([str(target_exe_path)], cwd=str(dst_dir), close_fds=True)
-                logging.info("Relaunch successful. Exiting updater.")
-            except Exception as exc:
-                logging.error(f"Failed to relaunch app: {exc}")
+        if success:
+            _cleanup_session_paths(src_dir_arg)
         else:
-            logging.error(f"Target executable not found: {target_exe_path}")
+            logging.critical("Update failed after all retries; relaunching previous version.")
     finally:
         release_update_lock(lock_path)
+        if should_relaunch:
+            _relaunch_app(dst_dir, target_exe_name)
 
 
 if __name__ == "__main__":

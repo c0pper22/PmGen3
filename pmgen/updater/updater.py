@@ -50,6 +50,14 @@ def _stage_updater_exe(updater_source: Path) -> Optional[Path]:
         stage_dir = Path(tempfile.gettempdir()) / "pmgen_updater_stage"
         stage_dir.mkdir(parents=True, exist_ok=True)
 
+        # Best-effort cleanup of staged updaters from previous runs.
+        # A copy that is still executing is locked and the unlink simply fails.
+        for stale in stage_dir.glob("updater_*.exe"):
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+
         staged_path = stage_dir / f"updater_{uuid.uuid4().hex}.exe"
         shutil.copy2(updater_source, staged_path)
         return staged_path
@@ -220,18 +228,34 @@ class UpdateWorker(QObject):
             self.error_occurred.emit(f"Extraction failed: {str(e)}")
 
 
-def perform_restart(zip_path_str: str, temp_extract_dir_str: str) -> None:
+def perform_restart(zip_path_str: str, temp_extract_dir_str: str) -> bool:
     """
     Terminates the current application and launches an external updater executable
     to move files from temp_extract_dir to the main directory.
+
+    Returns False if the restart could not be initiated (caller should inform the
+    user); does not return at all on success (the process exits).
     """
     if not getattr(sys, 'frozen', False):
         logging.warning("Application is not frozen. Skipping restart/update logic.")
-        return
+        return False
 
     current_exe = Path(sys.executable)
     current_dir = current_exe.parent
     exe_name = current_exe.name
+
+    # Pre-flight: verify the install directory is writable BEFORE exiting the app.
+    # Otherwise the updater fails after the app has already quit and the user is
+    # left with a closed application and no visible error.
+    try:
+        probe = current_dir / f".pmgen_write_test_{uuid.uuid4().hex}"
+        probe.touch()
+        probe.unlink()
+    except OSError as e:
+        logging.critical(
+            f"Install directory is not writable: {current_dir} ({e}). Aborting update restart."
+        )
+        return False
 
     # Prefer an updater shipped in the extracted update payload so the updater can be patched.
     temp_extract_dir = Path(temp_extract_dir_str)
@@ -243,13 +267,13 @@ def perform_restart(zip_path_str: str, temp_extract_dir_str: str) -> None:
                 "Updater executable not found in update payload or install directory. "
                 f"Looked in: {temp_extract_dir} and {current_dir}"
             )
-            return
+            return False
 
     # Stage updater to temp before launching. This allows it to overwrite the installed updater.exe.
     staged_updater = _stage_updater_exe(updater_source)
     if staged_updater is None or not staged_updater.exists():
         logging.critical("Failed to stage updater executable; aborting update restart.")
-        return
+        return False
 
     zip_path = Path(zip_path_str)
     try:
