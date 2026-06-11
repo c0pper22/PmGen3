@@ -9,7 +9,7 @@ from datetime import datetime
 from PyQt6.QtCore import (
     Qt, QSize, QPoint, QRect, QEvent, QRegularExpression,
     QCoreApplication, QSettings, QThread, pyqtSlot, QTimer, pyqtSignal,
-    QSortFilterProxyModel, QModelIndex
+    QSortFilterProxyModel, QModelIndex, QObject
 )
 from PyQt6.QtGui import (
     QAction, QIcon, QCursor, QRegularExpressionValidator, QKeySequence, 
@@ -502,6 +502,29 @@ BULK_SETTINGS_TOOLTIPS = {
     "unpack_min_age": "Skip serials unpacked more recently than this many months ago.",
     "unpack_max_age": "Skip serials unpacked more than this many months ago.",
 }
+
+class _AutoLoginWorker(QObject):
+    """Performs auto-login HTTP requests on a background thread."""
+    finished = pyqtSignal()
+    succeeded = pyqtSignal(object, str)  # (session, username)
+    failed = pyqtSignal(str)            # error message
+
+    def __init__(self, username: str, parent=None):
+        super().__init__(parent)
+        self._username = username
+
+    @pyqtSlot()
+    def run(self):
+        try:
+            from pmgen.io import http_client as hc
+            sess = requests.Session()
+            hc.login(sess)
+            self.succeeded.emit(sess, self._username)
+        except Exception as e:
+            self.failed.emit(str(e))
+        finally:
+            self.finished.emit()
+
 
 class MainWindow(WindowResizeMixin, QMainWindow):
     # ---- PM settings Keys ----
@@ -1714,27 +1737,52 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     # =========================================================================
 
     def _attempt_auto_login(self):
-        if self._auto_login_attempted or self._signed_in: return
-        self._auto_login_attempted = True
+        if self._auto_login_attempted or self._signed_in:
+            return
         s = QSettings()
-        if not bool(s.value(self.AUTH_REMEMBER_KEY, False, bool)): return
-        
+        if not bool(s.value(self.AUTH_REMEMBER_KEY, False, bool)):
+            self._auto_login_attempted = True
+            return
         u = s.value(self.AUTH_USERNAME_KEY, "", str)
-        if not u: return
-        
-        self.user_label.setText("Signing in…"); self.editor.appendPlainText(f"[Auto-Login] Attempting as {u}…")
+        if not u:
+            self._auto_login_attempted = True
+            return
+
+        self._auto_login_attempted = True
+        self.user_label.setText("Signing in…")
+        self.editor.appendPlainText(f"[Auto-Login] Attempting as {u}…")
+
+        # Run login on a background thread to avoid blocking the UI
+        self._login_thread = QThread()
+        self._login_worker = _AutoLoginWorker(u)
+        self._login_worker.moveToThread(self._login_thread)
+
+        self._login_thread.started.connect(self._login_worker.run)
+        self._login_worker.succeeded.connect(self._on_auto_login_success)
+        self._login_worker.failed.connect(self._on_auto_login_failure)
+        self._login_worker.finished.connect(self._login_thread.quit)
+        self._login_worker.finished.connect(self._login_worker.deleteLater)
+        self._login_thread.finished.connect(self._login_thread.deleteLater)
+        self._login_thread.start()
+
+    @pyqtSlot(object, str)
+    def _on_auto_login_success(self, session, username):
+        self._session = session
+        self._signed_in = True
+        self._current_user = username
+        self._update_auth_ui()
+        self.editor.appendPlainText(f"[Auto-Login] {username} — success")
         try:
-            from pmgen.io import http_client as hc
-            sess = requests.Session()
-            hc.login(sess)
-            self._session = sess
-            self._signed_in = True; self._current_user = u; self._update_auth_ui()
-            self.editor.appendPlainText(f"[Auto-Login] {u} — success")
-            self.customerMap = get_customer_map_after_login(sess)
-            print(self.customerMap)
-        except Exception as e:
-            self._signed_in = False; self._current_user = ""; self._update_auth_ui()
-            self.editor.appendPlainText(f"[Auto-Login] {u} — failed: {e}")
+            self.customerMap = get_customer_map_after_login(session)
+        except Exception:
+            pass
+
+    @pyqtSlot(str)
+    def _on_auto_login_failure(self, error_msg):
+        self._signed_in = False
+        self._current_user = ""
+        self._update_auth_ui()
+        self.editor.appendPlainText(f"[Auto-Login] — failed: {error_msg}")
 
     @safe_slot
     def _logout(self, *args):
