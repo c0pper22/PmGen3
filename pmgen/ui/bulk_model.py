@@ -33,18 +33,27 @@ class BulkQueueModel(QAbstractTableModel):
         int_offset = 5  # internal index 5+
 
         if self.has_custom_08:
+            self._c08_idx = int_offset
             self.visual_to_internal[col_offset] = int_offset
             col_offset += 1
             int_offset += 1
+        else:
+            self._c08_idx = None
+
         if self.has_custom_05:
+            self._c05_idx = int_offset
             self.visual_to_internal[col_offset] = int_offset
             col_offset += 1
             int_offset += 1
+        else:
+            self._c05_idx = None
 
         self.visual_to_internal[col_offset] = int_offset      # Status
         self.visual_to_internal[col_offset + 1] = int_offset + 1  # Result
         self.status_col = col_offset
         self.result_col = col_offset + 1
+        self._status_idx = int_offset
+        self._result_idx = int_offset + 1
 
     def rowCount(self, parent=None):
         return len(self._data)
@@ -125,22 +134,29 @@ class BulkQueueModel(QAbstractTableModel):
 
     def add_item(self, serial, model="Unknown", customer="", machine_status=""):
         self.beginInsertRows(QModelIndex(), len(self._data), len(self._data))
-        self._data.append([serial, model, customer, machine_status, "", "", "", "Queued", ""])
+        row = [serial, model, customer, machine_status, ""]
+        if self.has_custom_08: row.append("")
+        if self.has_custom_05: row.append("")
+        row.append("Queued")
+        row.append("")
+        self._data.append(row)
         self.endInsertRows()
 
     def update_status(self, serial, status, result, model=None, unpack_date=None, customer=None,
                       custom08_val=None, custom05_val=None, machine_status=None):
         for i, row in enumerate(self._data):
             if row[0] == serial:
-                row[7] = status
-                row[8] = result
+                row[self._status_idx] = status
+                row[self._result_idx] = result
 
                 if model and model != "Unknown": row[1] = model
                 if customer: row[2] = customer
                 if machine_status: row[3] = machine_status
                 if unpack_date: row[4] = unpack_date
-                if custom08_val is not None: row[5] = custom08_val
-                if custom05_val is not None: row[6] = custom05_val
+                if custom08_val is not None and self._c08_idx is not None:
+                    row[self._c08_idx] = custom08_val
+                if custom05_val is not None and self._c05_idx is not None:
+                    row[self._c05_idx] = custom05_val
 
                 self.dataChanged.emit(self.index(i, 1), self.index(i, self.columnCount() - 1))
                 return
