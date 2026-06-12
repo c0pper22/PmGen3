@@ -9,14 +9,14 @@ from contextlib import contextmanager
 from queue import LifoQueue, Empty
 from typing import Optional, List, Dict, Callable
 from datetime import date
-import datetime as _dt
 
 import requests
-import weakref
 from weakref import WeakSet
+
+from pmgen.io.fetch_serials import parse_serial_numbers, parse_customer_map
+
 # from pmgen.ui.main_window import SERVICE_NAME # Circular import risk, handled below
 SERVICE_NAME = "PmGen"
-from pmgen.io.fetch_serials import parse_serial_numbers, parse_customer_map, parse_description_map
 
 # Logging (safe; excludes credentials)
 LOG_DIR = os.path.join(os.path.expanduser("~"), ".indybiz_pm")

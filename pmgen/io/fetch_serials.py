@@ -196,40 +196,8 @@ def parse_customer_map(html: str) -> Dict[str, str]:
                 if customer_name and serial not in data_map:
                     data_map[serial] = customer_name
                                 
-        except Exception as e:
-            # Log error if needed, or pass
-            pass
-
-    return data_map
-
-def parse_description_map(html: str) -> Dict[str, str]:
-    """
-    Parses HTML to create a mapping of { Serial_Number : Description }.
-    """
-    if not isinstance(html, str) or not html:
-        return {}
-
-    data_map: Dict[str, str] = {}
-
-    if BeautifulSoup is not None:
-        try:
-            soup = BeautifulSoup(html, "html.parser")
-            
-            for serial_el in soup.select(".deviceSerialNumbers"):
-                serial = serial_el.get_text(strip=True)
-                
-                if serial:
-                    row = serial_el.find_parent("tr")
-                    
-                    if row:
-                        desc_el = row.select_one(".deviceDescription")
-                        if desc_el:
-                            description = desc_el.get_text(strip=True)
-                            
-                            if serial not in data_map:
-                                data_map[serial] = description
-
         except Exception:
+            # Log error if needed, or pass
             pass
 
     return data_map

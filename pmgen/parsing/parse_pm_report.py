@@ -94,9 +94,6 @@ import re
 from typing import Optional, List
 
 def ParsePmReport(data: bytes) -> PmReport:
-    import re
-    from typing import Optional, List
-
     # ---------------- helpers ----------------
     def clean_lines(b: bytes) -> List[str]:
         txt = b.decode("utf-8", errors="ignore")
@@ -228,8 +225,6 @@ def main():
     report = ParsePmReport(data)
 
     print(report)
-
-# main()  # disabled on import; guarded below
 
 # alias for engine
 parse_pm_report = ParsePmReport

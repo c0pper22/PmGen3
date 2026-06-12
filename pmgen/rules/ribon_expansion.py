@@ -1,12 +1,12 @@
 from __future__ import annotations
-from typing import Dict, List, Any, Set
+from typing import Dict, Set
 from pmgen.rules.base import Context, RuleBase
-from pmgen.engine.resolve_to_pn import resolve_with_rows
 
 class RibonExpansionRule(RuleBase):
     name = "RibonExpansionRule"
 
     def apply(self, ctx: Context) -> None:
+        from pmgen.engine.resolve_to_pn import resolve_with_rows
         # 1. Categorize Kits by "Due Reason" (Over 100% vs Threshold)
         over_100_kits: Set[str] = set()
         threshold_kits: Set[str] = set()
