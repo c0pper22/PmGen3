@@ -142,13 +142,98 @@ Build the PyInstaller distribution directly with:
 .\.venv\Scripts\pyinstaller.exe --noconfirm --clean pmgen.spec
 ```
 
-For the signed release ZIP and checksum workflow, use:
+The spec file produces two executables:
+- `dist/PmGen/PmGen.exe` — the main application.
+- `dist/PmGen/updater.exe` — the external update installer.
+
+For the signed release ZIP and manifest signing workflow, use:
 
 ```powershell
-.\.venv\Scripts\python.exe build_sign_zip.py
+.\\.venv\\Scripts\\python.exe build_sign_zip.py
 ```
 
-The release script expects a signing certificate at `helpers/IBSCert.pfx`, locates `signtool.exe`, signs generated binaries, creates `PmGen.zip`, and writes `PmGen.zip.sha256`. Publish both artifacts with the GitHub release so the updater can verify downloads.
+The release script:
+1. Runs PyInstaller from the spec.
+2. Signs all EXEs, DLLs, and PYDs with the PFX code-signing certificate using `signtool.exe`.
+3. Zips the `dist/PmGen` directory into `final/PmGen.zip`.
+4. Reads the app version from `pmgen/updater/updater.py`.
+5. Creates `final/manifest.json` with the ZIP's SHA-256 hash, size, version, and metadata.
+6. Signs the manifest with the Ed25519 private key, writing `final/manifest.json.sig`.
+
+Requires:
+- `PMGEN_SIGNING_KEY` environment variable set to the base64-encoded Ed25519 32-byte private key.
+- A code-signing PFX at `helpers/IBSCert.pfx`.
+- Windows SDK `signtool.exe` on the `PATH` or auto-discovered.
+
+Publish all three artifacts (`PmGen.zip`, `manifest.json`, `manifest.json.sig`) with the GitHub release so the updater can verify downloads.
+
+### Generating signing keys
+
+To generate a new Ed25519 keypair for release signing:
+
+```powershell
+.\\.venv\\Scripts\\python.exe generate_signing_keys.py -o keys/
+```
+
+Or, using the one-liner:
+
+```
+python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; import base64; key = Ed25519PrivateKey.generate(); print(f'Private: {base64.b64encode(key.private_bytes_raw()).decode()}'); print(f'Public:  {base64.b64encode(key.public_key().public_bytes_raw()).decode()}')"
+```
+
+- Store the **public** key in `pmgen/updater/updater.py` as `SIGNING_PUBLIC_KEY_B64`.
+- Store the **private** key securely (environment variable, key vault, HSM). Never commit it to the repository.
+
+## Updater
+
+PmGen includes a secure, cryptographically verified auto-updater that fetches releases from GitHub.
+
+### Update flow
+
+1. **Check**: The app fetches the latest GitHub release from `https://api.github.com/repos/c0pper22/PmGen/releases/latest`. It looks for three required assets: `manifest.json`, `manifest.json.sig`, and `PmGen.zip`.
+2. **Verify manifest signature**: The updater downloads `manifest.json` and `manifest.json.sig`, then verifies the Ed25519 signature using the hardcoded public key (`SIGNING_PUBLIC_KEY_B64`). If signature verification fails, the update is rejected.
+3. **Parse manifest**: The verified manifest is parsed and validated (schema version, app ID, signature algorithm, version, asset name, SHA-256 format, size, minimum supported version).
+4. **Version comparison**: If the manifest version is newer than `CURRENT_VERSION`, an update is available. Rollback is prevented by checking `update_state.json`.
+5. **Download**: The ZIP is downloaded with a progress bar. Content-Length is checked against the manifest, and the SHA-256 hash is computed and compared to the manifest after download.
+6. **Extract**: The verified ZIP is extracted to a temp directory with path-traversal protection. Extraction metadata is written to `.pmgen_verified_update.json`.
+7. **Restart**: The app saves the installed version to `update_state.json`, stages `updater.exe` to a temp directory, launches it with arguments (extracted payload directory, install target, exe name, parent PID, session ID), and exits.
+8. **Install**: The external `updater.exe` (`run_update.py`) waits for the parent process to exit, acquires a lock file, copies files from the extracted payload to the install directory, preserves `catalog_manager.db` and lock files, prunes stale runtime files, and relaunches the app. On failure, it rolls back and relaunches the previous version.
+
+### Signing architecture
+
+PmGen uses two separate signing systems:
+
+| System | Purpose | Key type | Location |
+|---|---|---|---|
+| Ed25519 manifest signing | Authenticate update manifests | Ed25519 key pair (32-byte) | Public key embedded in `updater.py`; private key in `PMGEN_SIGNING_KEY` env var |
+| PFX code signing | Sign Windows binaries (EXE/DLL/PYD) | PFX certificate with timestamping | `helpers/IBSCert.pfx`, applied by `build_sign_zip.py` via `signtool.exe` |
+
+These systems are independent. The Ed25519 key pair is used only for manifest signing and verification during updates. The PFX certificate is used only at build time for Authenticode code signing of distributed binaries.
+
+### Files produced by the build pipeline
+
+All release artifacts are placed in the `final/` directory:
+
+| File | Description |
+|---|---|
+| `final/PmGen.zip` | Signed, frozen application packaged with PyInstaller |
+| `final/manifest.json` | JSON metadata with version, SHA-256, size, release date, and minimum supported version |
+| `final/manifest.json.sig` | Base64-encoded Ed25519 signature of `manifest.json` |
+
+### Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `PMGEN_SIGNING_KEY` | Yes (for builds) | Base64-encoded Ed25519 private key (32 bytes raw). Used by `build_sign_zip.py` to sign `manifest.json`. Never commit this value. |
+
+### State files
+
+| File | Location | Purpose |
+|---|---|---|
+| `update_state.json` | `~/.indybiz_pm/` | Tracks last installed version and update timestamp for rollback protection |
+| `updater.log` | `~/.indybiz_pm/` | Rotating log for the external updater process |
+| `.pmgen_update.lock` | Install directory | Prevents concurrent update installations |
+| `.pmgen_verified_update.json` | Extracted payload directory | Verification metadata written after secure extraction |
 
 ## Operational Notes
 
