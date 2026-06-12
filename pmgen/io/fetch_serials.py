@@ -3,10 +3,13 @@ from __future__ import annotations
 from typing import List, Iterable, Dict
 import re
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from bs4 import BeautifulSoup
-except Exception:
+except ImportError:
     BeautifulSoup = None
 
 BASE_URL = "https://eservice.toshiba-solutions.com"
@@ -104,8 +107,7 @@ def parse_serial_numbers(html: str) -> List[str]:
                         if serial:
                             found.append(serial)
         except Exception:
-            # fall back to regex sweep
-            pass
+            logger.debug("BeautifulSoup parsing failed, falling back to regex sweep", exc_info=True)
 
     # Regex sweep for stragglers (JSON-inlined, plain text tables, etc.)
     for m in _SERIAL_RE.finditer(html):
@@ -197,8 +199,7 @@ def parse_customer_map(html: str) -> Dict[str, str]:
                     data_map[serial] = customer_name
                                 
         except Exception:
-            # Log error if needed, or pass
-            pass
+            logger.debug("BeautifulSoup customer map parsing failed", exc_info=True)
 
     return data_map
 

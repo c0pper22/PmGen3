@@ -11,6 +11,8 @@ import calendar
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from typing import Dict
 
+logger = logging.getLogger(__name__)
+
 
 class SingleReportWorker(QObject):
     finished = pyqtSignal(str)
@@ -259,6 +261,7 @@ class BulkRunner(QObject):
                                 if not custom08_val:
                                     custom08_val = "N/A"
                         except Exception:
+                            logger.warning(f"Failed to fetch 08 blob for serial {serial}")
                             pass
 
                         try:
@@ -269,6 +272,7 @@ class BulkRunner(QObject):
                                 if not custom05_val:
                                     custom05_val = "N/A"
                         except Exception:
+                            logger.warning(f"Failed to fetch 05 blob for serial {serial}")
                             pass
 
                     # B. Parse & Calculate
@@ -390,7 +394,7 @@ class BulkRunner(QObject):
 
         except Exception as e:
             self.finished.emit(f"[Info] Failed: {e}")
-            traceback.print_exc()
+            logger.exception(f"BulkRunner failed: {e}")
         finally:
             if pool:
                 try: pool.close()

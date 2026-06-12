@@ -215,19 +215,5 @@ def ParsePmReport(data: bytes) -> PmReport:
     return PmReport(headers=headers, counters=counters, items=items)
 
 
-def main():
-
-    path = r"C:\Users\kyles\Projects\PM_Gen_2.0\PM_LIST_CNJL43460_20251018230645.csv"
-
-    with open(path, "rb") as f:
-        data = f.read()
-
-    report = ParsePmReport(data)
-
-    print(report)
-
 # alias for engine
 parse_pm_report = ParsePmReport
-
-if __name__ == "__main__":
-    main()

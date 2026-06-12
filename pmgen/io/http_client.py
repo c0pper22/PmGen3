@@ -123,13 +123,6 @@ def login(sess: requests.Session) -> None:
 
     log.info(f"Attempting login flow for user: {username}")
 
-    try:
-        r = sess.get(LOGIN_PAGE, headers=HEADERS_COMMON, timeout=30)
-        r.raise_for_status()
-    except Exception as e:
-        log.error(f"Failed to reach login page: {e}")
-        raise
-
     if not (username and password):
         raise RuntimeError("No saved credentials. Use Settings -> Credentials...")
 

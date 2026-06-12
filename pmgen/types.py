@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Set
+from typing import Optional, Dict, List
 
 @dataclass
 class Finding:
