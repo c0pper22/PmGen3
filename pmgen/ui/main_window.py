@@ -469,7 +469,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self._update_worker.check_finished.connect(self._on_check_finished)
         self._update_worker.error_occurred.connect(self._on_update_error)
         self._update_worker.download_progress.connect(self._on_download_progress)
-        self._update_worker.download_finished.connect(self._on_download_complete)
         
         self._update_worker.check_finished.connect(self._update_thread.quit)
         self._update_worker.error_occurred.connect(self._update_thread.quit)
@@ -563,9 +562,17 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         if hasattr(self, "_dl_bar"):
             self._dl_bar.setValue(pct)
 
-    @pyqtSlot(str)
-    def _on_download_complete(self, zip_path):
+    @pyqtSlot(bool, str)
+    def _on_download_complete(self, success, zip_path):
         """Switch UI to Extraction mode and start extraction via signal."""
+        if not success:
+            dl_dialog = getattr(self, "_dl_dialog", None)
+            if dl_dialog is not None:
+                dl_dialog.close()
+                self._dl_dialog = None
+            self.editor.appendPlainText(f"[Update Error] Download failed: {zip_path}")
+            return
+
         if hasattr(self, "_dl_label"):
             self._dl_label.setText("Extracting Files...")
         if hasattr(self, "_dl_bar"):

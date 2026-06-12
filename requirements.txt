@@ -1,5 +1,6 @@
 beautifulsoup4==4.14.2
 certifi==2025.10.5
+cryptography>=41.0.0
 idna==3.11
 jaraco.classes==3.4.0
 jaraco.context==6.0.1

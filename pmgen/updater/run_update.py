@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 import shutil
 import time
 import subprocess
@@ -7,6 +8,8 @@ import logging
 import logging.handlers
 import traceback
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -74,6 +77,26 @@ def validate_payload_root(src_dir: Path, target_exe_name: str) -> tuple[bool, st
         return False, f"Payload missing required _internal directory: {payload_internal}"
 
     return True, "ok"
+
+
+def _check_verified_update_metadata(extract_dir: Path) -> bool:
+    """Check that .pmgen_verified_update.json exists and is valid.
+
+    This is NOT a security boundary — it only catches programming mistakes.
+    The real security boundary is signature verification + hash checking in updater.py.
+    """
+    metadata_path = extract_dir / ".pmgen_verified_update.json"
+    if not metadata_path.exists():
+        logger.warning("No verified update metadata found at %s", metadata_path)
+        return False
+    try:
+        data = json.loads(metadata_path.read_text(encoding="utf-8"))
+        logger.info("Verified update metadata: version=%s, sha256=%s",
+                     data.get("version", "unknown"), data.get("sha256", "unknown")[:16])
+        return True
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Failed to read verified update metadata: %s", e)
+        return False
 
 
 def setup_logging() -> None:
@@ -547,6 +570,9 @@ def main() -> None:
         logging.error(f"Invalid update payload: {payload_msg}")
         _relaunch_app(dst_dir, target_exe_name)
         return
+
+    if not _check_verified_update_metadata(resolved_src_dir):
+        logger.warning("Verified update metadata check failed; continuing install anyway")
 
     lock_path = None
     should_relaunch = True
