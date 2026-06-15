@@ -21,7 +21,7 @@
 - [ ] **DSDF & RSDF detection** — correct part selection based on document feeder type
 - [ ] **Single report UI rework** — replace plain-text output with widgets/panels (collapsible sections, kit tables, color-coded due flags, graphs)
 - [ ] **Recent Error Codes section** — fetch and display recent device error/fault codes in a dedicated tab or panel alongside PM data
-
+- [ ] **automatic Ribon update detection** - reverse ribon.exe, figure out how to automatically check if ribon is up to date or not. (if possible update it, this is a long shot.)
 ---
 
 ## 📊 Custom CSV Tracking

@@ -1379,6 +1379,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
         profiles_layout.addWidget(profile_combo)
         profiles_layout.addLayout(profile_btn_row)
+        profiles_layout.addStretch(1)
 
         def _repopulate_profiles(select_name: str | None = None):
             """Refresh combo items and optionally select a specific name."""
