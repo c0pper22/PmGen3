@@ -414,10 +414,13 @@ class WidgetReportView(QWidget):
         content_row.addWidget(summary_wrap, 0)
         layout.addLayout(content_row)
 
-        # ── 4. Wear Analysis table ──
+        # ── 4. Error History ──
+        self._build_error_history(layout, data, colors)
+
+        # ── 5. Wear Analysis table ──
         self._build_wear_table(layout, data, colors)
 
-        # ── 5. Final Parts ──
+        # ── 6. Final Parts ──
         self._build_final_parts(layout, data, colors)
 
         layout.addStretch()
@@ -534,6 +537,100 @@ class WidgetReportView(QWidget):
                 row.addWidget(card)
         row.addStretch()
         parent.addLayout(row)
+
+    def _build_error_history(self, parent: QVBoxLayout, data: SingleReportData, colors: dict) -> None:
+        """Build the error history table between counters and wear analysis."""
+        error_records = data.error_records
+        r = _corner_radii()
+
+        def _copy_error_history():
+            headers = ["Code", "Counter", "Date", "Time"]
+            rows = []
+            for rec in error_records:
+                rows.append([rec.code, rec.counter, rec.date, rec.time])
+            _copy_tsv(headers, rows)
+
+        parent.addWidget(_section_header("Error History", colors, _copy_error_history))
+
+        if not error_records:
+            none_lbl = QLabel("No error history available")
+            none_lbl.setStyleSheet(
+                f"color: {colors['muted'].name()}; font-size: 11px; padding: 4px 0;"
+            )
+            parent.addWidget(none_lbl)
+            return
+
+        table = QTableWidget()
+        table.setColumnCount(4)
+        table.setHorizontalHeaderLabels(["Code", "Counter", "Date", "Time"])
+        table.horizontalHeader().setStretchLastSection(False)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(0, 80)
+        table.setColumnWidth(1, 100)
+        table.setColumnWidth(2, 120)
+        table.setColumnWidth(3, 100)
+
+        table.verticalHeader().setVisible(False)
+        table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setAlternatingRowColors(False)
+        table.setShowGrid(False)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        table.setFixedHeight(len(error_records) * 28 + 30)
+
+        table.setStyleSheet(
+            f"QTableWidget {{"
+            f"  background-color: {colors['surface'].name()};"
+            f"  border: 1px solid {colors['border'].name()};"
+            f"  border-radius: {r['md']}px;"
+            f"  gridline-color: transparent;"
+            f"}}"
+            f"QHeaderView::section {{"
+            f"  background-color: {colors['surface_high'].name()};"
+            f"  color: {colors['muted'].name()};"
+            f"  border: none;"
+            f"  padding: 6px 8px;"
+            f"  font-size: 11px;"
+            f"  font-weight: 700;"
+            f"}}"
+        )
+
+        table.setRowCount(len(error_records))
+        for i, rec in enumerate(error_records):
+            # Code
+            code_item = QTableWidgetItem(rec.code)
+            code_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            code_item.setForeground(colors['danger'])
+            code_font = QFont()
+            code_font.setBold(True)
+            code_item.setFont(code_font)
+            table.setItem(i, 0, code_item)
+
+            # Counter
+            counter_item = QTableWidgetItem(rec.counter)
+            counter_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            counter_item.setForeground(colors['text'])
+            table.setItem(i, 1, counter_item)
+
+            # Date
+            date_item = QTableWidgetItem(rec.date)
+            date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            date_item.setForeground(colors['text'])
+            table.setItem(i, 2, date_item)
+
+            # Time
+            time_item = QTableWidgetItem(rec.time)
+            time_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            time_item.setForeground(colors['muted'])
+            table.setItem(i, 3, time_item)
+
+            table.setRowHeight(i, 28)
+
+        parent.addWidget(table)
 
     def _build_wear_table(self, parent: QVBoxLayout, data: SingleReportData, colors: dict) -> None:
         r = _corner_radii()

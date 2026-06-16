@@ -76,6 +76,7 @@ class SingleReportData:
     findings: List[Finding] = field(default_factory=list)
     final_parts_over_100: List[FinalPartEntry] = field(default_factory=list)
     final_parts_threshold: List[FinalPartEntry] = field(default_factory=list)
+    error_records: List[object] = field(default_factory=list)
     due_count: int = 0
     ok_count: int = 0
     total_items: int = 0

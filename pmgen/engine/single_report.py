@@ -541,6 +541,7 @@ def build_report_data(
     unpacking_date: Optional[Union[str, date]] = None,
     alerts_enabled: bool = True,
     customer_name: str = "",
+    error_records: Optional[list] = None,
 ) -> SingleReportData:
     """Build a structured SingleReportData from parsed report + rule selection."""
     model, serial, dt_str = _report_header_fields(report)
@@ -593,6 +594,7 @@ def build_report_data(
         findings=findings,
         final_parts_over_100=final_over,
         final_parts_threshold=final_thr,
+        error_records=error_records if error_records else [],
         due_count=due_count,
         ok_count=ok_count,
         total_items=total_items,

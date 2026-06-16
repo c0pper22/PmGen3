@@ -37,6 +37,17 @@ class SingleReportWorker(QObject):
 
             unpacking_date = get_unpacking_date(self.serial, sess=self.session)
 
+            # Fetch error history (non-fatal: empty list on failure)
+            error_records = []
+            try:
+                from pmgen.io.http_client import fetch_error_history, parse_error_history_csv
+                error_csv = fetch_error_history(self.serial, sess=self.session)
+                error_records = parse_error_history_csv(error_csv)
+            except Exception:
+                logger.warning(
+                    "Failed to fetch error history for serial %s", self.serial, exc_info=True
+                )
+
             from pmgen.parsing.parse_pm_report import parse_pm_report
             from pmgen.engine.run_rules import run_rules
 
@@ -58,6 +69,7 @@ class SingleReportWorker(QObject):
                 unpacking_date=unpacking_date,
                 alerts_enabled=self.alerts_enabled,
                 customer_name=self.customer_name,
+                error_records=error_records,
             )
             self.data_ready.emit(report_data)
 

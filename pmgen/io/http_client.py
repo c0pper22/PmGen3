@@ -470,6 +470,108 @@ def get_device_info_08(serial: str, sess: Optional[requests.Session] = None) -> 
     except Exception:
         return {"date": None, "model": "Unknown"}
 
+def fetch_error_history(
+    serial: str,
+    utc_offset: int = 240,
+    sess: Optional[requests.Session] = None,
+) -> str:
+    """Fetch error history CSV text for a device from Toshiba eService.
+
+    Args:
+        serial: Device serial number.
+        utc_offset: UTC local time difference in minutes (default 240 = UTC+4 EST).
+        sess: Optional authenticated requests.Session. A temp session is created
+              and logged in if not provided.
+
+    Returns:
+        Raw CSV text from the ErrorHistory service file.
+    """
+    owns_session = False
+    if sess is None:
+        sess = requests.Session()
+        login(sess)
+        owns_session = True
+    try:
+        params = {
+            "deviceSerial": f" {serial} ",
+            "option": "ErrorHistory",
+            "utcLocalTimeDiff": str(utc_offset),
+        }
+        headers = {**HEADERS_COMMON, "Referer": DEVICE_INDEX}
+        log.info("Requesting error history: serial=%s", serial)
+        r = sess.get(SERVICE_FILES, params=params, headers=headers, timeout=60)
+        r.raise_for_status()
+        ctype = (r.headers.get("Content-Type") or "").lower()
+        if "text/html" in ctype:
+            raise RuntimeError("Expected CSV bytes; got HTML (likely not logged in).")
+        return r.text
+    finally:
+        if owns_session:
+            try:
+                sess.close()
+            except Exception:
+                pass
+
+
+def parse_error_history_csv(csv_text: str) -> list:
+    """Parse Toshiba error history CSV into a list of ErrorRecord.
+
+    The CSV format has 5-6 metadata header lines, then a column header line
+    starting with ``CODE,COUNTER,DATE-TIME,...``, followed by data rows.
+
+    Returns a list sorted by DATE-TIME descending (most recent first).
+    """
+    from pmgen.models.error_record import ErrorRecord
+
+    records: list[ErrorRecord] = []
+    lines = csv_text.splitlines()
+    in_data = False
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            # Stop parsing once we hit empty lines after data
+            if in_data:
+                break
+            continue
+
+        # Detect the column header line
+        if stripped.startswith("CODE,COUNTER,DATE-TIME"):
+            in_data = True
+            continue
+
+        if not in_data:
+            continue
+
+        # Parse data row
+        parts = stripped.split(",")
+        if len(parts) < 3:
+            continue
+
+        code = parts[0].strip()
+        counter = parts[1].strip()
+        date_time = parts[2].strip()
+
+        # Split DATE-TIME "YYYY-MM-DD HH:MM:SS" into date and time
+        if " " in date_time:
+            date_part, time_part = date_time.split(" ", 1)
+        else:
+            date_part = date_time
+            time_part = ""
+
+        if date_part and code:
+            records.append(ErrorRecord(
+                code=code,
+                counter=counter,
+                date=date_part,
+                time=time_part,
+            ))
+
+    # Sort by DATE-TIME descending (most recent first)
+    records.sort(key=lambda r: f"{r.date} {r.time}", reverse=True)
+    return records
+
+
 def server_side_logout(sess: Optional[requests.Session] = None) -> None:
     """Best-effort: call portal logout endpoint with a session (or temp one)."""
     s = sess or requests.Session()
