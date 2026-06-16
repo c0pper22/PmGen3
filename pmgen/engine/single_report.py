@@ -138,12 +138,18 @@ def _calc_unpack_alert(unpacking_date: Optional[Union[str, date]]) -> Optional[s
     return None
 
 
-def _collect_alerts(meta: dict, unpacking_date: Optional[Union[str, date]]) -> List[str]:
-    alerts = list(meta.get("alerts", []) or [])
+def _collect_mandatory_alerts(unpacking_date: Optional[Union[str, date]]) -> List[str]:
+    """Collect alerts that always appear and cannot be turned off."""
+    alerts: List[str] = []
     unpack_alert = _calc_unpack_alert(unpacking_date)
     if unpack_alert:
         alerts.append(unpack_alert)
     return alerts
+
+
+def _collect_optional_alerts(meta: dict) -> List[str]:
+    """Collect rule-generated alerts that can be toggled off in settings."""
+    return list(meta.get("optional_alerts", []) or [])
 
 
 def _build_counter_lines(counters: dict) -> List[str]:
@@ -212,8 +218,10 @@ def _extract_model_code(model: str) -> str:
 
 def _build_pdf_styles():
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="AlertHeader", parent=styles["Heading4"], textColor=colors.red, spaceBefore=6, spaceAfter=2))
-    styles.add(ParagraphStyle(name="AlertText", parent=styles["BodyText"], textColor=colors.red, fontSize=9))
+    styles.add(ParagraphStyle(name="MandatoryAlertHeader", parent=styles["Heading4"], textColor=colors.red, spaceBefore=6, spaceAfter=2))
+    styles.add(ParagraphStyle(name="MandatoryAlertText", parent=styles["BodyText"], textColor=colors.red, fontSize=9))
+    styles.add(ParagraphStyle(name="AlertHeader", parent=styles["Heading4"], textColor=colors.orange, spaceBefore=6, spaceAfter=2))
+    styles.add(ParagraphStyle(name="AlertText", parent=styles["BodyText"], textColor=colors.orange, fontSize=9))
     styles.add(ParagraphStyle(name="H1", fontName="Helvetica-Bold", fontSize=12, leading=16, textColor=colors.HexColor("#111827"), spaceBefore=0, spaceAfter=2))
     styles.add(ParagraphStyle(name="Meta", fontName="Helvetica", fontSize=9, leading=10, textColor=colors.HexColor("#374151"), spaceBefore=0, spaceAfter=2))
     styles.add(ParagraphStyle(name="Section", fontName="Helvetica-Bold", fontSize=11, leading=12, textColor=colors.HexColor("#111827"), spaceBefore=4, spaceAfter=2))
@@ -299,7 +307,8 @@ def format_report(
 
     final_lines: List[str] = []
     meta = getattr(selection, "meta", {}) or {}
-    alerts = _collect_alerts(meta, unpacking_date)
+    mandatory_alerts = _collect_mandatory_alerts(unpacking_date)
+    optional_alerts = _collect_optional_alerts(meta) if alerts_enabled else []
     final_over, final_thr = _build_final_parts_lists(meta, threshold_enabled)
 
     over_rows = [f"{int(qty)}x → {pn} → {unit}" for qty, pn, unit in final_over]
@@ -353,10 +362,17 @@ def format_report(
     if customer_name:
         lines.append(f"Customer: {customer_name}")
 
-    if alerts and alerts_enabled:
+    if mandatory_alerts:
+        lines.append("")
+        lines.append("!!! MANDATORY ALERTS !!!")
+        for alert in mandatory_alerts:
+            lines.append(f"  [!!] {alert}")
+        lines.append("")
+
+    if optional_alerts:
         lines.append("")
         lines.append("!!! SYSTEM ALERTS !!!")
-        for alert in alerts:
+        for alert in optional_alerts:
             lines.append(f"  [!] {alert}")
         lines.append("")
 
@@ -417,7 +433,8 @@ def create_pdf_report(
         most_due.append([canon, f"{pct:.1f}%", status, kit])
 
     meta = getattr(selection, "meta", {}) or {}
-    alerts = _collect_alerts(meta, unpacking_date)
+    mandatory_alerts = _collect_mandatory_alerts(unpacking_date)
+    optional_alerts = _collect_optional_alerts(meta) if alerts_enabled else []
     final_over, final_thr = _build_final_parts_lists(meta, threshold_enabled)
 
     best_used_pct = (max((getattr(f, "life_used", None) or 0.0) for f in combined) * 100.0) if combined else 0.0
@@ -451,12 +468,19 @@ def create_pdf_report(
         story.append(Paragraph("Counters: " + "  ".join(parts), styles["Meta"]))
     story.append(Spacer(1, 4))
 
-    if alerts and alerts_enabled:
+    if mandatory_alerts:
+        story.append(Paragraph("Mandatory Alerts", styles["MandatoryAlertHeader"]))
+        for alert in mandatory_alerts:
+            story.append(Paragraph(f"• {alert}", styles["MandatoryAlertText"]))
+        story.append(Spacer(1, 4))
+        story.append(_hline(thickness=1.0, color=colors.red))
+
+    if optional_alerts:
         story.append(Paragraph("System Alerts", styles["AlertHeader"]))
-        for alert in alerts:
+        for alert in optional_alerts:
             story.append(Paragraph(f"• {alert}", styles["AlertText"]))
         story.append(Spacer(1, 4))
-        story.append(_hline(thickness=0.5, color=colors.red))
+        story.append(_hline(thickness=0.5, color=colors.orange))
 
     if most_due:
         data = [["Canon", "Life Used", "Status", "Unit"]] + most_due
@@ -523,7 +547,8 @@ def build_report_data(
     counters = getattr(report, "counters", {}) or {}
 
     meta = getattr(selection, "meta", {}) or {}
-    alerts = _collect_alerts(meta, unpacking_date) if alerts_enabled else []
+    mandatory_alerts = _collect_mandatory_alerts(unpacking_date)
+    optional_alerts = _collect_optional_alerts(meta) if alerts_enabled else []
 
     combined = _combined_findings_for_text(selection, show_all)
 
@@ -562,7 +587,8 @@ def build_report_data(
         threshold=threshold,
         threshold_enabled=threshold_enabled,
         life_basis=life_basis,
-        alerts=alerts,
+        mandatory_alerts=mandatory_alerts,
+        optional_alerts=optional_alerts,
         counters=dict(counters) if counters else {},
         findings=findings,
         final_parts_over_100=final_over,

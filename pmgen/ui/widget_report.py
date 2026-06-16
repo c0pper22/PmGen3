@@ -380,10 +380,25 @@ class WidgetReportView(QWidget):
         parent.addWidget(container)
 
     def _build_alerts(self, parent: QVBoxLayout, data: SingleReportData, colors: dict) -> None:
-        if not data.alerts:
-            return
+        # Mandatory alerts (red, always shown)
+        for alert in data.mandatory_alerts:
+            banner = QLabel(f"⛔  {alert}")
+            banner.setWordWrap(True)
+            banner.setStyleSheet(
+                f"QLabel {{"
+                f"  background-color: {colors['danger_bg'].name()};"
+                f"  color: {colors['danger'].name()};"
+                f"  border: 1px solid {colors['danger'].name()};"
+                f"  border-radius: 6px;"
+                f"  padding: 8px 12px;"
+                f"  font-size: 12px;"
+                f"  font-weight: 600;"
+                f"}}"
+            )
+            parent.addWidget(banner)
 
-        for alert in data.alerts:
+        # Optional alerts (yellow, toggleable)
+        for alert in data.optional_alerts:
             banner = QLabel(f"⚠  {alert}")
             banner.setWordWrap(True)
             banner.setStyleSheet(
@@ -615,11 +630,11 @@ class WidgetReportView(QWidget):
             return row
 
         parent.addLayout(_stat_row("Due items:", str(data.due_count)))
+        parent.addLayout(_stat_row("Total items:", str(data.total_items)))
         parent.addLayout(_stat_row("Highest wear:", f"{data.highest_wear_pct:.1f}%"))
         thr_text = f"{data.threshold * 100:.1f}%" if data.threshold_enabled else "100%"
         parent.addLayout(_stat_row("Threshold:", thr_text))
         parent.addLayout(_stat_row("Basis:", data.life_basis.upper()))
-        parent.addLayout(_stat_row("Total items:", str(data.total_items)))
 
         parent.addSpacing(8)
 

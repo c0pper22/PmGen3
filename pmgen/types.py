@@ -70,7 +70,8 @@ class SingleReportData:
     threshold: float = 0.80
     threshold_enabled: bool = True
     life_basis: str = "page"
-    alerts: List[str] = field(default_factory=list)
+    mandatory_alerts: List[str] = field(default_factory=list)
+    optional_alerts: List[str] = field(default_factory=list)
     counters: Dict[str, object] = field(default_factory=dict)
     findings: List[Finding] = field(default_factory=list)
     final_parts_over_100: List[FinalPartEntry] = field(default_factory=list)

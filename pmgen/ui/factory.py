@@ -99,7 +99,7 @@ class UIFactory:
         
         settings_btn.setMenu(settings_menu)
 
-        act_alerts = QAction("Enable System Alerts", window)
+        act_alerts = QAction("Enable Optional Alerts", window)
         act_alerts.setCheckable(True)
         act_alerts.setChecked(window._get_alerts_enabled())
         act_alerts.toggled.connect(window._set_alerts_enabled)

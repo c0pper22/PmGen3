@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QRectF
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen
+from PyQt6.QtCore import QRectF, QSize, Qt
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPaintEvent, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 
 
 class DonutChart(QWidget):
     """A donut/ring chart showing due vs. OK counts with center text."""
+
+    MIN_SIZE = 140
+    START_ANGLE = 90 * 16  # Qt angles are 1/16 degree; 90 degrees is 12 o'clock.
+    FULL_CIRCLE = 360 * 16
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -17,22 +21,23 @@ class DonutChart(QWidget):
         self._total_items: int = 0
         self._highest_pct: float = 0.0
 
-        # Colors — overridable for theme support
+        # Colors — overridable for theme support.
         self._due_color = QColor("#e74c3c")
         self._ok_color = QColor("#2ecc71")
         self._bg_ring_color = QColor("#3a3f4b")
         self._text_color = QColor("#e0e0e0")
         self._sub_text_color = QColor("#909090")
 
-        self.setMinimumSize(140, 140)
+        self.setMinimumSize(self.MIN_SIZE, self.MIN_SIZE)
 
     # ---- public API ----
 
     def set_data(self, due_count: int, ok_count: int, total_items: int, highest_pct: float) -> None:
-        self._due_count = due_count
-        self._ok_count = ok_count
-        self._total_items = total_items
-        self._highest_pct = highest_pct
+        """Update chart values and trigger a repaint."""
+        self._due_count = max(0, int(due_count))
+        self._ok_count = max(0, int(ok_count))
+        self._total_items = max(0, int(total_items))
+        self._highest_pct = max(0.0, float(highest_pct))
         self.update()
 
     def set_colors(
@@ -43,80 +48,145 @@ class DonutChart(QWidget):
         text: QColor,
         sub_text: QColor,
     ) -> None:
-        self._due_color = due
-        self._ok_color = ok
-        self._bg_ring_color = bg_ring
-        self._text_color = text
-        self._sub_text_color = sub_text
+        """Update chart colors and trigger a repaint."""
+        self._due_color = QColor(due)
+        self._ok_color = QColor(ok)
+        self._bg_ring_color = QColor(bg_ring)
+        self._text_color = QColor(text)
+        self._sub_text_color = QColor(sub_text)
         self.update()
+
+    # ---- paint helpers ----
+
+    @staticmethod
+    def _ring_pen(color: QColor, width: float) -> QPen:
+        pen = QPen(color)
+        pen.setWidthF(width)
+        pen.setStyle(Qt.PenStyle.SolidLine)
+        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+        return pen
+
+    def _draw_full_ring(self, painter: QPainter, rect: QRectF, width: float, color: QColor) -> None:
+        painter.setPen(self._ring_pen(color, width))
+        painter.drawEllipse(rect)
+
+    def _draw_arc(
+        self,
+        painter: QPainter,
+        rect: QRectF,
+        width: float,
+        color: QColor,
+        start_angle: int,
+        span_angle: int,
+    ) -> None:
+        if span_angle == 0:
+            return
+
+        painter.setPen(self._ring_pen(color, width))
+        painter.drawArc(rect, start_angle, span_angle)
 
     # ---- paint ----
 
-    def paintEvent(self, event) -> None:
+    def paintEvent(self, event: QPaintEvent) -> None:
+        _ = event
+
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
 
-        w = self.width()
-        h = self.height()
-        side = min(w, h)
-        ring_width = max(8, side * 0.12)
-        margin = ring_width / 2.0 + 2
+        width = self.width()
+        height = self.height()
+        side = min(width, height)
 
-        cx = w / 2.0
-        cy = h / 2.0
-        radius = (side / 2.0) - margin
+        ring_width = max(10.0, side * 0.12)
+        margin = (ring_width / 2.0) + 2.0
+        radius = max(1.0, (side / 2.0) - margin)
 
-        rect = QRectF(cx - radius, cy - radius, radius * 2, radius * 2)
+        center_x = width / 2.0
+        center_y = height / 2.0
+        ring_rect = QRectF(
+            center_x - radius,
+            center_y - radius,
+            radius * 2.0,
+            radius * 2.0,
+        )
 
-        total = self._due_count + self._ok_count
+        due_count = self._due_count
+        ok_count = self._ok_count
+        chart_total = due_count + ok_count
 
-        if total <= 0:
-            # Empty state: full gray ring
-            pen = QPen(self._bg_ring_color, ring_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap)
-            painter.setPen(pen)
-            painter.drawArc(rect, 0, 360 * 16)
-        else:
-            due_angle = int(360 * self._due_count / total * 16)
-            ok_angle = 360 * 16 - due_angle
+        # Always draw the neutral ring first. This gives empty states a visible ring and
+        # prevents small anti-aliased seams from showing the widget background.
+        self._draw_full_ring(painter, ring_rect, ring_width, self._bg_ring_color)
 
-            # OK arc (drawn first, underneath)
-            pen = QPen(self._ok_color, ring_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap)
-            painter.setPen(pen)
-            painter.drawArc(rect, 90 * 16, ok_angle)
+        if chart_total > 0:
+            if due_count == chart_total:
+                self._draw_full_ring(painter, ring_rect, ring_width, self._due_color)
+            elif ok_count == chart_total:
+                self._draw_full_ring(painter, ring_rect, ring_width, self._ok_color)
+            else:
+                # Qt draws positive spans counter-clockwise. Negative spans draw clockwise,
+                # which is usually what users expect from a 12 o'clock starting position.
+                due_angle = round(self.FULL_CIRCLE * (due_count / chart_total))
+                due_angle = min(max(1, due_angle), self.FULL_CIRCLE - 1)
+                ok_angle = self.FULL_CIRCLE - due_angle
 
-            # Due arc (drawn on top)
-            if due_angle > 0:
-                pen = QPen(self._due_color, ring_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap)
-                painter.setPen(pen)
-                painter.drawArc(rect, (90 * 16) - ok_angle, due_angle)
+                due_span = -due_angle
+                ok_span = -ok_angle
 
-        # Center text
-        due_font = QFont()
-        due_font.setPixelSize(max(14, int(side * 0.18)))
+                # Put the important value first: red starts at 12 o'clock, green follows it.
+                self._draw_arc(
+                    painter,
+                    ring_rect,
+                    ring_width,
+                    self._due_color,
+                    self.START_ANGLE,
+                    due_span,
+                )
+                self._draw_arc(
+                    painter,
+                    ring_rect,
+                    ring_width,
+                    self._ok_color,
+                    self.START_ANGLE + due_span,
+                    ok_span,
+                )
+
+        # Center text.
+        due_font = QFont(self.font())
+        due_font.setPixelSize(max(16, int(side * 0.20)))
         due_font.setBold(True)
-        painter.setFont(due_font)
-        painter.setPen(self._text_color)
 
-        due_text = str(self._due_count)
-        painter.drawText(QRectF(0, cy - radius * 0.35, w, radius * 0.5), Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom, due_text)
-
-        due_label_font = QFont()
-        due_label_font.setPixelSize(max(10, int(side * 0.09)))
-        painter.setFont(due_label_font)
-        painter.setPen(self._due_color)
-        painter.drawText(QRectF(0, cy - radius * 0.10, w, radius * 0.25), Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, "due")
-
-        sub_font = QFont()
+        sub_font = QFont(self.font())
         sub_font.setPixelSize(max(9, int(side * 0.08)))
-        painter.setFont(sub_font)
+
+        due_metrics = QFontMetrics(due_font)
+        sub_metrics = QFontMetrics(sub_font)
+        spacing = max(2, int(side * 0.02))
+        text_block_height = due_metrics.height() + spacing + sub_metrics.height()
+        text_top = center_y - (text_block_height / 2.0)
+
+        painter.setPen(self._text_color)
+        painter.setFont(due_font)
+        painter.drawText(
+            QRectF(0, text_top, width, due_metrics.height()),
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+            str(due_count),
+        )
+
+        display_total = self._total_items if self._total_items > 0 else chart_total
         painter.setPen(self._sub_text_color)
-        painter.drawText(QRectF(0, cy + radius * 0.12, w, radius * 0.4), Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, f"{self._total_items} total items")
+        painter.setFont(sub_font)
+        painter.drawText(
+            QRectF(0, text_top + due_metrics.height() + spacing, width, sub_metrics.height()),
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+            f"{display_total} total items",
+        )
 
         painter.end()
 
-    def sizeHint(self):
+    def sizeHint(self) -> QSize:
         return self.minimumSizeHint()
 
-    def minimumSizeHint(self):
-        from PyQt6.QtCore import QSize
-        return QSize(140, 140)
+    def minimumSizeHint(self) -> QSize:
+        return QSize(self.MIN_SIZE, self.MIN_SIZE)

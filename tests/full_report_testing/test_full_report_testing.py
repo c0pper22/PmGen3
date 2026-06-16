@@ -89,7 +89,7 @@ def test_full_pm_report_generation(csv_path, json_path):
     meta = getattr(selection, "meta", {})
     actual_parts = meta.get("selection_pn") or {}
 
-    alerts = meta.get("alerts", [])
+    alerts = meta.get("optional_alerts", [])
     
     due_items = []
     if hasattr(selection, "items") and selection.items:
@@ -134,10 +134,11 @@ def test_run_rules_meta_contract_regression(csv_path, json_path):
     )
 
     meta = getattr(selection, "meta", {}) or {}
-    for key in ("watch", "all_items", "alerts"):
+    for key in ("watch", "all_items", "optional_alerts", "mandatory_alerts"):
         assert key in meta, f"Missing meta key: {key}"
 
-    assert isinstance(meta["alerts"], list)
+    assert isinstance(meta["optional_alerts"], list)
+    assert isinstance(meta["mandatory_alerts"], list)
     assert isinstance(meta["all_items"], list)
     assert isinstance(getattr(selection, "items", []), list)
 

@@ -14,7 +14,8 @@ class Context:
     threshold_enabled: bool = False
     findings: Dict[str, Finding] = field(default_factory=dict)
     kit_selection: Dict[str, int] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
+    mandatory_alerts: List[str] = field(default_factory=list)
+    optional_alerts: List[str] = field(default_factory=list)
     meta: Dict[str, Any] = field(default_factory=dict)
 
 class RuleBase:
