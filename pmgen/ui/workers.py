@@ -5,7 +5,7 @@ from fnmatch import fnmatchcase
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_08_bytes, _parse_code_from_csv_bytes, get_unpacking_date
-from pmgen.engine.single_report import generate_from_bytes
+from pmgen.engine.single_report import generate_from_bytes, build_report_data
 from datetime import datetime, date
 import calendar
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class SingleReportWorker(QObject):
     finished = pyqtSignal(str)
+    data_ready = pyqtSignal(object)
     error = pyqtSignal(str)
 
     def __init__(self, session, serial, threshold, life_basis, show_all, threshold_enabled, alerts_enabled, customer_name=""):
@@ -33,9 +34,33 @@ class SingleReportWorker(QObject):
         """This runs in the background thread."""
         try:
             pm_pdf_bytes = get_service_file_bytes(self.serial, option="PMSupport", sess=self.session)
-            
+
             unpacking_date = get_unpacking_date(self.serial, sess=self.session)
-            
+
+            from pmgen.parsing.parse_pm_report import parse_pm_report
+            from pmgen.engine.run_rules import run_rules
+
+            report = parse_pm_report(pm_pdf_bytes)
+            selection = run_rules(
+                report,
+                threshold=self.threshold,
+                life_basis=self.life_basis,
+                threshold_enabled=self.threshold_enabled,
+            )
+
+            report_data = build_report_data(
+                report=report,
+                selection=selection,
+                threshold=self.threshold,
+                life_basis=self.life_basis,
+                show_all=self.show_all,
+                threshold_enabled=self.threshold_enabled,
+                unpacking_date=unpacking_date,
+                alerts_enabled=self.alerts_enabled,
+                customer_name=self.customer_name,
+            )
+            self.data_ready.emit(report_data)
+
             report_text = generate_from_bytes(
                 pm_pdf_bytes=pm_pdf_bytes,
                 threshold=self.threshold,
@@ -44,7 +69,7 @@ class SingleReportWorker(QObject):
                 threshold_enabled=self.threshold_enabled,
                 unpacking_date=unpacking_date,
                 alerts_enabled=self.alerts_enabled,
-                customer_name=self.customer_name
+                customer_name=self.customer_name,
             )
 
             self.finished.emit(report_text)

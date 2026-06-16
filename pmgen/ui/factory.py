@@ -75,6 +75,12 @@ class UIFactory:
         act_color.toggled.connect(lambda c: (window._set_colorized(c), window._apply_colorized_highlighter()))
         settings_menu.addAction(act_color)
 
+        act_rich = QAction("Rich Report View", window)
+        act_rich.setCheckable(True)
+        act_rich.setChecked(window._get_report_style() == "widget")
+        act_rich.toggled.connect(lambda c: window._set_report_style("widget" if c else "text"))
+        settings_menu.addAction(act_rich)
+
         act_appearance = QAction("Appearance", window)
         act_appearance.triggered.connect(window._open_appearance_dialog)
         settings_menu.addAction(act_appearance)

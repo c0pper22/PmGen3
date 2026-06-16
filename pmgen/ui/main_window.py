@@ -171,6 +171,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self._auto_login_attempted: bool = False
         self._session = None
         self._catalog_editor_window: CatalogEditorWindow | None = None
+        self._cached_report_data = None  # cached SingleReportData for re-render on style switch
 
         # Global tracking + event filter
         app = QApplication.instance()
@@ -731,6 +732,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
         self._single_thread.started.connect(self._single_worker.run)
         
+        self._single_worker.data_ready.connect(self._on_single_report_data_ready)
         self._single_worker.finished.connect(self._on_single_report_success)
         self._single_worker.error.connect(self._on_single_report_error)
         
@@ -751,9 +753,39 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         if hasattr(self, '_apply_colorized_highlighter'):
              self._apply_colorized_highlighter()
 
+    @pyqtSlot(object)
+    def _on_single_report_data_ready(self, data):
+        """Called when the worker emits structured report data."""
+        widget_view = getattr(self, '_widget_view', None)
+        if widget_view is not None:
+            widget_view.set_report_data(data)
+        # Cache the data so we can re-render on theme/style switch
+        self._cached_report_data = data
+
+    def _get_report_style(self) -> str:
+        from PyQt6.QtCore import QSettings
+        return QSettings().value("ui/single_report_style", "widget", str)
+
+    def _set_report_style(self, mode: str) -> None:
+        from PyQt6.QtCore import QSettings
+        QSettings().setValue("ui/single_report_style", mode)
+        if hasattr(self, 'tab_home'):
+            self.tab_home.set_view_mode(mode)
+        # Re-populate widget view with cached data if switching to widget mode
+        if mode == "widget":
+            cached = getattr(self, '_cached_report_data', None)
+            widget_view = getattr(self, '_widget_view', None)
+            if cached is not None and widget_view is not None:
+                widget_view.set_report_data(cached)
+
     def _on_single_report_error(self, error_message):
         """Called automatically if the background worker fails."""
         self.editor.setPlainText(error_message)
+        # Clear widget view on error
+        widget_view = getattr(self, '_widget_view', None)
+        if widget_view is not None:
+            widget_view.clear()
+        self._cached_report_data = None
 
     def _cleanup_single_thread(self):
         """Closes the loading screen and cleanly stops the thread."""
@@ -812,7 +844,12 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self._id_combo.setEditText(serial)
         self._on_generate_clicked()
 
-    def _clear_output_window(self): self.editor.clear()
+    def _clear_output_window(self):
+        self.editor.clear()
+        widget_view = getattr(self, '_widget_view', None)
+        if widget_view is not None:
+            widget_view.clear()
+        self._cached_report_data = None
 
     # =========================================================================
     #  Dialogs
@@ -925,6 +962,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                 return
             manager.toggle()
             _sync_theme_button()
+            # Refresh widget report view if it exists and has data
+            widget_view = getattr(self, '_widget_view', None)
+            if widget_view is not None and getattr(self, '_cached_report_data', None) is not None:
+                widget_view.refresh_theme()
 
         corner_label = QLabel("Corner Roundness", dlg)
         corner_label.setObjectName("DialogLabel")

@@ -14,7 +14,7 @@ from reportlab.platypus.flowables import HRFlowable, KeepTogether
 
 from pmgen.engine.run_rules import run_rules
 from pmgen.parsing.parse_pm_report import parse_pm_report
-from pmgen.types import PmReport
+from pmgen.types import FinalPartEntry, Finding, PmReport, SingleReportData
 
 
 SEPARATOR_LINE = "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
@@ -504,6 +504,74 @@ def create_pdf_report(
         story.append(KeepTogether(tbl))
 
     doc.build(story)
+
+
+def build_report_data(
+    *,
+    report: PmReport,
+    selection,
+    threshold: float,
+    life_basis: str,
+    show_all: bool = False,
+    threshold_enabled: bool = True,
+    unpacking_date: Optional[Union[str, date]] = None,
+    alerts_enabled: bool = True,
+    customer_name: str = "",
+) -> SingleReportData:
+    """Build a structured SingleReportData from parsed report + rule selection."""
+    model, serial, dt_str = _report_header_fields(report)
+    counters = getattr(report, "counters", {}) or {}
+
+    meta = getattr(selection, "meta", {}) or {}
+    alerts = _collect_alerts(meta, unpacking_date) if alerts_enabled else []
+
+    combined = _combined_findings_for_text(selection, show_all)
+
+    findings: list[Finding] = []
+    for f in combined:
+        findings.append(Finding(
+            canon=getattr(f, "canon", "—"),
+            life_used=getattr(f, "life_used", None),
+            due=bool(getattr(f, "due", False)),
+            kit_code=getattr(f, "kit_code", None),
+            qty=int(getattr(f, "qty", 1) or 1),
+        ))
+
+    due_count = sum(1 for f in findings if f.due)
+    total_items = len(findings)
+    ok_count = total_items - due_count
+    highest_wear_pct = (max((f.life_used or 0.0) for f in findings) * 100.0) if findings else 0.0
+
+    final_over_raw, final_thr_raw = _build_final_parts_lists(meta, threshold_enabled)
+    final_over = [FinalPartEntry(qty=int(q), part_number=str(pn), unit=str(unit)) for q, pn, unit in final_over_raw]
+    final_thr = [FinalPartEntry(qty=int(q), part_number=str(pn), unit=str(unit)) for q, pn, unit in final_thr_raw]
+
+    unpack_str = ""
+    if unpacking_date:
+        if isinstance(unpacking_date, (date, datetime)):
+            unpack_str = unpacking_date.strftime("%Y-%m-%d") if hasattr(unpacking_date, "strftime") else str(unpacking_date)
+        else:
+            unpack_str = str(unpacking_date)
+
+    return SingleReportData(
+        model=model,
+        serial=serial,
+        last_reported=dt_str,
+        unpacking_date=unpack_str,
+        customer_name=customer_name,
+        threshold=threshold,
+        threshold_enabled=threshold_enabled,
+        life_basis=life_basis,
+        alerts=alerts,
+        counters=dict(counters) if counters else {},
+        findings=findings,
+        final_parts_over_100=final_over,
+        final_parts_threshold=final_thr,
+        due_count=due_count,
+        ok_count=ok_count,
+        total_items=total_items,
+        highest_wear_pct=highest_wear_pct,
+    )
 
 
 def generate_from_bytes(

@@ -53,6 +53,12 @@ class _ToolbarWindow(QMainWindow):
     def _set_alerts_enabled(self, checked):
         pass
 
+    def _get_report_style(self):
+        return "widget"
+
+    def _set_report_style(self, mode):
+        pass
+
     def _start_bulk(self):
         pass
 

@@ -49,3 +49,33 @@ class PmReport:
     headers: Dict[str, str] = field(default_factory=dict)
     counters: Dict[str, Optional[int]] = field(default_factory=dict)
     items: List[PmItem] = field(default_factory=list)
+
+
+@dataclass
+class FinalPartEntry:
+    """A single row in a Final Parts list."""
+    qty: int
+    part_number: str
+    unit: str
+
+
+@dataclass
+class SingleReportData:
+    """Structured data for a single-report generation, consumed by widget-based UI."""
+    model: str = ""
+    serial: str = ""
+    last_reported: str = ""
+    unpacking_date: str = ""
+    customer_name: str = ""
+    threshold: float = 0.80
+    threshold_enabled: bool = True
+    life_basis: str = "page"
+    alerts: List[str] = field(default_factory=list)
+    counters: Dict[str, object] = field(default_factory=dict)
+    findings: List[Finding] = field(default_factory=list)
+    final_parts_over_100: List[FinalPartEntry] = field(default_factory=list)
+    final_parts_threshold: List[FinalPartEntry] = field(default_factory=list)
+    due_count: int = 0
+    ok_count: int = 0
+    total_items: int = 0
+    highest_wear_pct: float = 0.0
