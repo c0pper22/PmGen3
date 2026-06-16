@@ -131,7 +131,7 @@ def _calc_unpack_alert(unpacking_date: Optional[Union[str, date]]) -> Optional[s
         age_months = (today.year - unpack_date.year) * 12 + (today.month - unpack_date.month)
 
         if age_months > older_than_filter:
-            return f"Unpacking Date Alert: Unit is {age_months}. Talk to FSM."
+            return f"Unpacking Date Alert: Unit is {age_months} months old. Talk to FSM."
     except Exception:
         pass
 

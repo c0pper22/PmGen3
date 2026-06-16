@@ -300,6 +300,12 @@ class WidgetReportView(QWidget):
         counters_wrap = QWidget()
         counters_wrap.setLayout(counters_col)
 
+        # Subtle vertical separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setStyleSheet(f"QFrame {{ color: {colors['border'].name()}; }}")
+        sep.setFixedWidth(1)
+
         # Summary (right, inline, no card background)
         summary_col = QVBoxLayout()
         summary_col.setSpacing(8)
@@ -308,9 +314,32 @@ class WidgetReportView(QWidget):
         summary_wrap.setLayout(summary_col)
         summary_wrap.setFixedWidth(260)
 
-        counters_summary.addWidget(counters_wrap, 1)
-        counters_summary.addWidget(summary_wrap, 0)
-        layout.addLayout(counters_summary)
+        # Inline labels row: Counters left, Summary right
+        labels_row = QHBoxLayout()
+        labels_row.setSpacing(16)
+        labels_row.addWidget(_section_label("Counters", colors))
+        labels_row.addStretch()
+        # Push Summary label to align with the summary column (260px + separator)
+        summary_label_wrap = QWidget()
+        summary_label_wrap.setFixedWidth(260)
+        sl_layout = QHBoxLayout(summary_label_wrap)
+        sl_layout.setContentsMargins(0, 0, 0, 0)
+        sl_layout.addWidget(_section_label("Summary", colors))
+        sl_layout.addStretch()
+        labels_row.addWidget(summary_label_wrap)
+        layout.addLayout(labels_row)
+
+        # Content row
+        content_row = QHBoxLayout()
+        content_row.setSpacing(16)
+        content_row.addWidget(counters_wrap, 1)
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.VLine)
+        sep2.setStyleSheet(f"QFrame {{ color: {colors['border'].name()}; }}")
+        sep2.setFixedWidth(1)
+        content_row.addWidget(sep2, 0)
+        content_row.addWidget(summary_wrap, 0)
+        layout.addLayout(content_row)
 
         # ── 4. Wear Analysis table ──
         self._build_wear_table(layout, data, colors)
@@ -375,10 +404,8 @@ class WidgetReportView(QWidget):
         if not counters:
             return
 
-        parent.addWidget(_section_label("Counters", colors))
-
         row = QHBoxLayout()
-        row.setSpacing(10)
+        row.setSpacing(16)
 
         def _card(key: str, label: str) -> QWidget | None:
             val = counters.get(key)
@@ -386,24 +413,24 @@ class WidgetReportView(QWidget):
                 return None
             w = QWidget()
             w.setObjectName("CounterCard")
-            w.setMinimumWidth(90)
+            w.setFixedWidth(140)
             w.setStyleSheet(
                 f"QWidget#CounterCard {{"
                 f"  background-color: {colors['surface'].name()};"
                 f"  border: 1px solid {colors['border'].name()};"
                 f"  border-radius: 8px;"
-                f"  padding: 10px 16px;"
+                f"  padding: 12px 20px;"
                 f"}}"
             )
             vl = QVBoxLayout(w)
             vl.setContentsMargins(0, 0, 0, 0)
-            vl.setSpacing(4)
+            vl.setSpacing(6)
             vl_lbl = QLabel(label)
             vl_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            vl_lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;")
+            vl_lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;")
             vl_val = QLabel(f"{val:,}" if isinstance(val, (int, float)) else str(val))
             vl_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            vl_val.setStyleSheet(f"color: {colors['text'].name()}; font-size: 16px; font-weight: 700;")
+            vl_val.setStyleSheet(f"color: {colors['text'].name()}; font-size: 20px; font-weight: 800;")
             vl.addWidget(vl_lbl)
             vl.addWidget(vl_val)
             return w
@@ -411,8 +438,8 @@ class WidgetReportView(QWidget):
         for key, lbl in [("color", "Color"), ("black", "Black"), ("df", "DF"), ("total", "Total")]:
             card = _card(key, lbl)
             if card:
+                row.addStretch()
                 row.addWidget(card)
-
         row.addStretch()
         parent.addLayout(row)
 
@@ -574,7 +601,6 @@ class WidgetReportView(QWidget):
 
     def _build_summary_inline(self, parent: QVBoxLayout, data: SingleReportData, colors: dict) -> None:
         """Inline summary — no card background, plain text stats + donut chart."""
-        parent.addWidget(_section_label("Summary", colors))
 
         def _stat_row(stat_label: str, stat_value: str):
             row = QHBoxLayout()
