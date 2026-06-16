@@ -989,6 +989,11 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             if manager is not None:
                 manager.reapply()
             self.apply_window_roundness(value)
+            # Re-render widget report view so inline QSS picks up new corner radii
+            cached = getattr(self, '_cached_report_data', None)
+            widget_view = getattr(self, '_widget_view', None)
+            if cached is not None and widget_view is not None:
+                widget_view.set_report_data(cached)
 
         btn_theme.clicked.connect(lambda _checked=False: _toggle_theme())
         corner_slider.valueChanged.connect(lambda v: corner_box.setValue(int(v)))

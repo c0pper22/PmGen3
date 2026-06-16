@@ -5,6 +5,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
+    QApplication,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -14,12 +15,20 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from pmgen.types import SingleReportData
 from .donut_chart import DonutChart
+from .theme import (
+    CORNER_ROUNDNESS_KEY,
+    RADIUS_MD,
+    RADIUS_LG,
+    _corner_scale,
+    _scaled_radius,
+)
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -73,12 +82,57 @@ def _section_label(text: str, colors: dict) -> QLabel:
         f"QLabel {{"
         f"  color: {colors['accent'].name()};"
         f"  font-weight: 700;"
-        f"  font-size: 13px;"
+        f"  font-size: 15px;"
         f"  padding: 0;"
         f"  margin: 0;"
         f"}}"
     )
     return lbl
+
+
+def _section_header(text: str, colors: dict, on_copy: callable) -> QWidget:
+    """Section label + material copy icon button."""
+    w = QWidget()
+    w.setStyleSheet("background: transparent;")
+    row = QHBoxLayout(w)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(6)
+
+    label = _section_label(text, colors)
+    row.addWidget(label)
+
+    btn = QToolButton()
+    btn.setText("\u29c9")  # ⧉ copy icon
+    btn.setToolTip("Copy table to clipboard")
+    btn.setFixedSize(24, 24)
+    r_md = _corner_radii()["md"]
+    btn.setStyleSheet(
+        f"QToolButton {{"
+        f"  background-color: transparent;"
+        f"  color: {colors['muted'].name()};"
+        f"  border: 1px solid {colors['border'].name()};"
+        f"  border-radius: {r_md}px;"
+        f"  font-size: 14px;"
+        f"  padding: 0;"
+        f"}}"
+        f"QToolButton:hover {{"
+        f"  background-color: {colors['surface_high'].name()};"
+        f"  color: {colors['accent'].name()};"
+        f"}}"
+    )
+    btn.clicked.connect(on_copy)
+    row.addWidget(btn)
+    row.addStretch()
+    return w
+
+
+def _copy_tsv(headers: list[str], rows: list[list[str]]) -> None:
+    """Copy table data to the system clipboard with columns separated by ' — '."""
+    sep = " — "
+    lines = [sep.join(headers)]
+    for row in rows:
+        lines.append(sep.join(row))
+    QApplication.clipboard().setText("\n".join(lines))
 
 
 def _separator(colors: dict) -> QFrame:
@@ -89,17 +143,29 @@ def _separator(colors: dict) -> QFrame:
     return line
 
 
+def _corner_radii() -> dict[str, int]:
+    """Return radius tokens scaled by the user's corner roundness slider (0–100)."""
+    strength = int(QSettings().value(CORNER_ROUNDNESS_KEY, 50, int))
+    scale = _corner_scale(strength)
+    return {
+        "md": _scaled_radius(RADIUS_MD, scale),
+        "lg": _scaled_radius(RADIUS_LG, scale),
+        "badge": min(_scaled_radius(RADIUS_LG, scale), 10),  # cap for pill-shaped badges
+    }
+
+
 def _pill_label(text: str, bg: str, fg: str) -> QLabel:
     lbl = QLabel(text)
     lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
     lbl.setFixedHeight(25)
     lbl.setFixedWidth(50)
     lbl.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+    r = _corner_radii()["badge"]
     lbl.setStyleSheet(
         f"QLabel {{"
         f"  background-color: {bg};"
         f"  color: {fg};"
-        f"  border-radius: 6px;"
+        f"  border-radius: {r}px;"
         f"  padding: 1px 6px;"
         f"  font-weight: 600;"
         f"  font-size: 10px;"
@@ -129,7 +195,10 @@ class _WearBar(QWidget):
 
         w = self.width()
         h = self.height()
-        radius = h / 2
+
+        # Scale corner radius by user's corner roundness slider, capped at pill shape
+        scale = _corner_scale(int(QSettings().value(CORNER_ROUNDNESS_KEY, 50, int)))
+        radius = min(int(h / 2 * scale), h / 2)
 
         # Background track
         painter.setPen(Qt.PenStyle.NoPen)
@@ -275,7 +344,11 @@ class WidgetReportView(QWidget):
 
         data = self._data
         colors = _theme_colors()
-        self._content.setStyleSheet(f"background-color: {colors['bg'].name()};")
+        r = _corner_radii()
+        self._content.setStyleSheet(
+            f"background-color: {colors['bg'].name()};"
+            f" border-radius: {r['lg']}px;"
+        )
 
         layout = self._content.layout()
         if layout is None:
@@ -363,10 +436,10 @@ class WidgetReportView(QWidget):
 
         def _add(row: int, col: int, label: str, value: str, value_color: str | None = None):
             lbl = QLabel(f"{label}:")
-            lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 12px; font-weight: 600;")
+            lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 14px; font-weight: 700;")
             val = QLabel(value)
             c = value_color or colors['text'].name()
-            val.setStyleSheet(f"color: {c}; font-size: 13px; font-weight: 500;")
+            val.setStyleSheet(f"color: {c}; font-size: 15px; font-weight: 700;")
             grid.addWidget(lbl, row, col * 2)
             grid.addWidget(val, row, col * 2 + 1)
 
@@ -380,6 +453,8 @@ class WidgetReportView(QWidget):
         parent.addWidget(container)
 
     def _build_alerts(self, parent: QVBoxLayout, data: SingleReportData, colors: dict) -> None:
+        r = _corner_radii()
+
         # Mandatory alerts (red, always shown)
         for alert in data.mandatory_alerts:
             banner = QLabel(f"⛔  {alert}")
@@ -389,7 +464,7 @@ class WidgetReportView(QWidget):
                 f"  background-color: {colors['danger_bg'].name()};"
                 f"  color: {colors['danger'].name()};"
                 f"  border: 1px solid {colors['danger'].name()};"
-                f"  border-radius: 6px;"
+                f"  border-radius: {r['md']}px;"
                 f"  padding: 8px 12px;"
                 f"  font-size: 12px;"
                 f"  font-weight: 600;"
@@ -406,7 +481,7 @@ class WidgetReportView(QWidget):
                 f"  background-color: {colors['warning_bg'].name()};"
                 f"  color: {colors['warning'].name()};"
                 f"  border: 1px solid {colors['warning'].name()};"
-                f"  border-radius: 6px;"
+                f"  border-radius: {r['md']}px;"
                 f"  padding: 8px 12px;"
                 f"  font-size: 12px;"
                 f"  font-weight: 500;"
@@ -418,6 +493,8 @@ class WidgetReportView(QWidget):
         counters = data.counters
         if not counters:
             return
+
+        r = _corner_radii()
 
         row = QHBoxLayout()
         row.setSpacing(16)
@@ -433,7 +510,7 @@ class WidgetReportView(QWidget):
                 f"QWidget#CounterCard {{"
                 f"  background-color: {colors['surface'].name()};"
                 f"  border: 1px solid {colors['border'].name()};"
-                f"  border-radius: 8px;"
+                f"  border-radius: {r['lg']}px;"
                 f"  padding: 12px 20px;"
                 f"}}"
             )
@@ -459,7 +536,19 @@ class WidgetReportView(QWidget):
         parent.addLayout(row)
 
     def _build_wear_table(self, parent: QVBoxLayout, data: SingleReportData, colors: dict) -> None:
-        parent.addWidget(_section_label("Wear Analysis", colors))
+        r = _corner_radii()
+
+        def _copy_wear():
+            headers = ["Item", "Unit", "Wear %", "Status"]
+            rows = []
+            for f in data.findings:
+                pct = (f.life_used or 0.0) * 100.0
+                unit = f.kit_code if f.kit_code else "—"
+                status = "DUE" if f.due else "OK"
+                rows.append([f.canon, unit, f"{pct:.1f}%", status])
+            _copy_tsv(headers, rows)
+
+        parent.addWidget(_section_header("Wear Analysis", colors, _copy_wear))
 
         table = QTableWidget()
         table.setColumnCount(5)
@@ -480,13 +569,15 @@ class WidgetReportView(QWidget):
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setAlternatingRowColors(False)
         table.setShowGrid(False)
-        table.setFixedHeight(min(400, max(100, len(data.findings) * 34 + 30)))
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        table.setFixedHeight(len(data.findings) * 32 + 30)
 
         table.setStyleSheet(
             f"QTableWidget {{"
             f"  background-color: {colors['surface'].name()};"
             f"  border: 1px solid {colors['border'].name()};"
-            f"  border-radius: 6px;"
+            f"  border-radius: {r['md']}px;"
             f"  gridline-color: transparent;"
             f"}}"
             f"QHeaderView::section {{"
@@ -553,12 +644,19 @@ class WidgetReportView(QWidget):
             return
 
         def _parts_table(entries, title: str):
-            parent.addWidget(_section_label(title, colors))
+            def _copy_parts():
+                headers = ["Qty", "Part Number", "Unit"]
+                rows = [[str(e.qty), e.part_number, e.unit] for e in entries]
+                _copy_tsv(headers, rows)
+
+            parent.addWidget(_section_header(title, colors, _copy_parts))
             if not entries:
                 none_lbl = QLabel("(none)")
                 none_lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 11px; padding: 4px 0;")
                 parent.addWidget(none_lbl)
                 return
+
+            rp = _corner_radii()
 
             table = QTableWidget()
             table.setColumnCount(3)
@@ -572,13 +670,15 @@ class WidgetReportView(QWidget):
             table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
             table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             table.setShowGrid(False)
-            table.setFixedHeight(min(300, max(60, len(entries) * 30 + 30)))
+            table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            table.setFixedHeight(len(entries) * 28 + 30)
 
             table.setStyleSheet(
                 f"QTableWidget {{"
                 f"  background-color: {colors['surface'].name()};"
                 f"  border: 1px solid {colors['border'].name()};"
-                f"  border-radius: 6px;"
+                f"  border-radius: {rp['md']}px;"
                 f"}}"
                 f"QHeaderView::section {{"
                 f"  background-color: {colors['surface_high'].name()};"
@@ -621,9 +721,9 @@ class WidgetReportView(QWidget):
             row = QHBoxLayout()
             row.setSpacing(8)
             lbl = QLabel(stat_label)
-            lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 11px;")
+            lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 13px;")
             val = QLabel(stat_value)
-            val.setStyleSheet(f"color: {colors['text'].name()}; font-size: 12px; font-weight: 700;")
+            val.setStyleSheet(f"color: {colors['text'].name()}; font-size: 14px; font-weight: 700;")
             row.addWidget(lbl)
             row.addStretch()
             row.addWidget(val)
