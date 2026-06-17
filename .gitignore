@@ -210,6 +210,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+# PmGen signing keys (NEVER commit the private key)
+signing_private.key
+signing_public.key
+keys/signing_private.key
+keys/signing_public.key
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

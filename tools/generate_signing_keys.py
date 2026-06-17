@@ -23,6 +23,10 @@ from cryptography.hazmat.primitives.serialization import (
     NoEncryption,
 )
 
+# Resolve repo root relative to this script's location
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_OUTPUT_DIR = str(REPO_ROOT / "keys")
+
 
 def generate_keypair() -> tuple[Ed25519PrivateKey, object]:
     """Generate a fresh Ed25519 keypair."""
@@ -80,8 +84,8 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         "-o",
-        default=".",
-        help="Output directory (default: current directory)",
+        default=DEFAULT_OUTPUT_DIR,
+        help="Output directory (default: keys/)",
     )
     args = parser.parse_args()
 

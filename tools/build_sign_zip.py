@@ -7,6 +7,10 @@ import hashlib
 import json
 import datetime
 import base64
+from pathlib import Path
+
+# Resolve paths relative to repo root (parent of this script's directory)
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Ed25519 private key for manifest signing (base64-encoded 32 bytes)
 # NEVER commit this value. Set as environment variable or read from secure location.
@@ -152,12 +156,15 @@ def read_version_from_updater(updater_path):
     raise ValueError(f"CURRENT_VERSION not found in {updater_path}")
 
 
-FINAL_DIR = "final"
+FINAL_DIR = str(REPO_ROOT / "final")
 
 if __name__ == "__main__":
-    DIST_DIR = "dist/PmGen"
-    PFX_FILE = r"C:\Users\Copper\PMGEN_TEST_3_13_26\PmGen\helpers\IBSCert.pfx"
-    SPEC_FILE = "pmgen.spec"
+    DIST_DIR = str(REPO_ROOT / "dist" / "PmGen")
+    PFX_FILE = os.environ.get(
+        "PMGEN_PFX_FILE",
+        r"C:\Users\Copper\PMGEN_TEST_3_13_26\PmGen\helpers\IBSCert.pfx",
+    )
+    SPEC_FILE = str(REPO_ROOT / "pmgen.spec")
     ZIP_NAME = os.path.join(FINAL_DIR, "PmGen.zip")
 
     os.makedirs(FINAL_DIR, exist_ok=True)
@@ -189,7 +196,9 @@ if __name__ == "__main__":
     zip_directory(DIST_DIR, ZIP_NAME)
 
     # Read version from updater.py
-    version = read_version_from_updater("pmgen/updater/updater.py")
+    version = read_version_from_updater(
+        str(REPO_ROOT / "pmgen" / "updater" / "updater.py")
+    )
     print(f"App version: {version}")
 
     if not PRIVATE_KEY_B64:
