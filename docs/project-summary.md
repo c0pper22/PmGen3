@@ -131,7 +131,7 @@ The production artifact is a Windows PyInstaller distribution built from `pmgen.
 
 `build_sign_zip.py` drives the release pipeline. It runs PyInstaller, discovers `signtool.exe` from the Windows SDK, signs generated executables, DLLs, and PYD files, zips `dist/PmGen` into `PmGen.zip`, and writes a SHA-256 sidecar file. The updater expects the GitHub release to publish both the ZIP and matching checksum file.
 
-At runtime, `UpdateWorker` checks `c0pper22/PmGen` GitHub releases, compares the latest tag with `CURRENT_VERSION`, downloads the ZIP, fetches the checksum sidecar, validates SHA-256, and extracts into a temporary session directory. `perform_restart()` stages an updater executable into temp and launches it with the extracted payload, current install directory, target executable name, parent PID, and session ID. `run_update.py` waits for the parent process, acquires an install lock, validates the payload root, preserves local database files, replaces `_internal`, copies top-level files, prunes stale runtime files, and rolls back on failure.
+At runtime, `UpdateWorker` checks `c0pper22/PmGen3` GitHub releases, compares the latest tag with `CURRENT_VERSION`, downloads the ZIP, fetches the checksum sidecar, validates SHA-256, and extracts into a temporary session directory. `perform_restart()` stages an updater executable into temp and launches it with the extracted payload, current install directory, target executable name, parent PID, and session ID. `run_update.py` waits for the parent process, acquires an install lock, validates the payload root, preserves local database files, replaces `_internal`, copies top-level files, prunes stale runtime files, and rolls back on failure.
 
 ## 7. Extension Patterns
 

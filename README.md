@@ -190,7 +190,7 @@ PmGen includes a secure, cryptographically verified auto-updater that fetches re
 
 ### Update flow
 
-1. **Check**: The app fetches the latest GitHub release from `https://api.github.com/repos/c0pper22/PmGen/releases/latest`. It looks for three required assets: `manifest.json`, `manifest.json.sig`, and `PmGen.zip`.
+1. **Check**: The app fetches the latest GitHub release from `https://api.github.com/repos/c0pper22/PmGen3/releases/latest`. It looks for three required assets: `manifest.json`, `manifest.json.sig`, and `PmGen.zip`.
 2. **Verify manifest signature**: The updater downloads `manifest.json` and `manifest.json.sig`, then verifies the Ed25519 signature using the hardcoded public key (`SIGNING_PUBLIC_KEY_B64`). If signature verification fails, the update is rejected.
 3. **Parse manifest**: The verified manifest is parsed and validated (schema version, app ID, signature algorithm, version, asset name, SHA-256 format, size, minimum supported version).
 4. **Version comparison**: If the manifest version is newer than `CURRENT_VERSION`, an update is available. Rollback is prevented by checking `update_state.json`.
