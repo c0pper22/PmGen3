@@ -19,16 +19,15 @@
 ## 🔧 Core Features
 
 - [ ] **DSDF & RSDF detection** — correct part selection based on document feeder type
-- [ ] **Single report UI rework** — replace plain-text output with widgets/panels (collapsible sections, kit tables, color-coded due flags, graphs)
-- [ ] **Recent Error Codes section** — fetch and display recent device error/fault codes in a dedicated tab or panel alongside PM data
+- [X] **Single report UI rework** — replace plain-text output with widgets/panels (collapsible sections, kit tables, color-coded due flags, graphs)
+- [X] **Recent Error Codes section** — fetch and display recent device error/fault codes in a dedicated tab or panel alongside PM data
 - [ ] **automatic Ribon update detection** - reverse ribon.exe, figure out how to automatically check if ribon is up to date or not. (if possible update it, this is a long shot.)
 ---
 
 ## 📊 Custom CSV Tracking
 
-- [ ] **E2E offline tests for 08/05 CSVs** — test `_parse_code_from_csv_bytes` with real example files (already have `08_example.csv` and `05_example.csv`)
-- [ ] **03/04 CSV parsing** — fetch other option codes from `GetServiceFiles` (e.g., option=03 for log data, option=04 for firmware version info)
-- [ ] **Subcode UI hint** — add "0 = subcode 0 or empty" label/placeholder near the sub spinbox so users know empty subs match
+- [ ] **E2E offline tests for 08/05/Error History CSVs** — test `_parse_code_from_csv_bytes` with real example files (already have `08_example.csv` and `05_example.csv`)
+- [X] **Subcode UI hint** — add "0 = subcode 0 or empty" label/placeholder near the sub spinbox so users know empty subs match
 
 ---
 
@@ -45,6 +44,7 @@
 
 ## 🖥️ UI / UX
 
+- [ ] **Fix Single (TEXT GEN) Light Mode** - fix colors during light mode for text based single gen. 
 - [ ] **Multi-select machine filter** — checkboxes for Active/Inactive instead of single dropdown
 - [ ] **"Test Connection" button** in login dialog — verify credentials before saving
 - [ ] **Keyboard shortcuts** — Ctrl+B for bulk, Ctrl+R for single report, F5 for refresh, Esc to close dialogs

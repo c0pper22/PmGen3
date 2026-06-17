@@ -362,22 +362,21 @@ class WidgetReportView(QWidget):
         # ── 2. Full-width alerts ──
         self._build_alerts(layout, data, colors)
 
-        # ── 3. Counters + Summary side by side ──
-        counters_summary = QHBoxLayout()
-        counters_summary.setSpacing(16)
+        # ── 3. Counters + Error History + Summary side by side ──
 
-        # Counters (left)
+        # Counters (left, compact)
         counters_col = QVBoxLayout()
         counters_col.setSpacing(8)
         self._build_counters(counters_col, data, colors)
         counters_wrap = QWidget()
         counters_wrap.setLayout(counters_col)
 
-        # Subtle vertical separator
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setStyleSheet(f"QFrame {{ color: {colors['border'].name()}; }}")
-        sep.setFixedWidth(1)
+        # Error History (middle, scrollable)
+        err_col = QVBoxLayout()
+        err_col.setSpacing(8)
+        self._build_error_history(err_col, data, colors)
+        err_wrap = QWidget()
+        err_wrap.setLayout(err_col)
 
         # Summary (right, inline, no card background)
         summary_col = QVBoxLayout()
@@ -387,12 +386,21 @@ class WidgetReportView(QWidget):
         summary_wrap.setLayout(summary_col)
         summary_wrap.setFixedWidth(260)
 
-        # Inline labels row: Counters left, Summary right
+        # Inline labels row: Counters | Error History | Summary
         labels_row = QHBoxLayout()
         labels_row.setSpacing(16)
         labels_row.addWidget(_section_label("Counters", colors))
+        labels_row.addSpacing(285)
+
+        def _copy_error_history() -> None:
+            headers = ["Code", "Counter", "Date", "Time"]
+            rows: list[list[str]] = []
+            for rec in data.error_records:
+                rows.append([rec.code, rec.counter, rec.date, rec.time])
+            _copy_tsv(headers, rows)
+
+        labels_row.addWidget(_section_header("Error History", colors, _copy_error_history))
         labels_row.addStretch()
-        # Push Summary label to align with the summary column (260px + separator)
         summary_label_wrap = QWidget()
         summary_label_wrap.setFixedWidth(260)
         sl_layout = QHBoxLayout(summary_label_wrap)
@@ -405,17 +413,20 @@ class WidgetReportView(QWidget):
         # Content row
         content_row = QHBoxLayout()
         content_row.setSpacing(16)
-        content_row.addWidget(counters_wrap, 1)
+        content_row.addWidget(counters_wrap, 0)
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.VLine)
         sep2.setStyleSheet(f"QFrame {{ color: {colors['border'].name()}; }}")
         sep2.setFixedWidth(1)
         content_row.addWidget(sep2, 0)
+        content_row.addWidget(err_wrap, 1)
+        sep3 = QFrame()
+        sep3.setFrameShape(QFrame.Shape.VLine)
+        sep3.setStyleSheet(f"QFrame {{ color: {colors['border'].name()}; }}")
+        sep3.setFixedWidth(1)
+        content_row.addWidget(sep3, 0)
         content_row.addWidget(summary_wrap, 0)
         layout.addLayout(content_row)
-
-        # ── 4. Error History ──
-        self._build_error_history(layout, data, colors)
 
         # ── 5. Wear Analysis table ──
         self._build_wear_table(layout, data, colors)
@@ -508,24 +519,24 @@ class WidgetReportView(QWidget):
                 return None
             w = QWidget()
             w.setObjectName("CounterCard")
-            w.setFixedWidth(140)
+            w.setFixedWidth(65)
             w.setStyleSheet(
                 f"QWidget#CounterCard {{"
                 f"  background-color: {colors['surface'].name()};"
                 f"  border: 1px solid {colors['border'].name()};"
                 f"  border-radius: {r['lg']}px;"
-                f"  padding: 12px 20px;"
+                f"  padding: 8px 10px;"
                 f"}}"
             )
             vl = QVBoxLayout(w)
             vl.setContentsMargins(0, 0, 0, 0)
-            vl.setSpacing(6)
+            vl.setSpacing(3)
             vl_lbl = QLabel(label)
             vl_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            vl_lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;")
+            vl_lbl.setStyleSheet(f"color: {colors['muted'].name()}; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;")
             vl_val = QLabel(f"{val:,}" if isinstance(val, (int, float)) else str(val))
             vl_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            vl_val.setStyleSheet(f"color: {colors['text'].name()}; font-size: 20px; font-weight: 800;")
+            vl_val.setStyleSheet(f"color: {colors['text'].name()}; font-size: 16px; font-weight: 800;")
             vl.addWidget(vl_lbl)
             vl.addWidget(vl_val)
             return w
@@ -550,8 +561,6 @@ class WidgetReportView(QWidget):
                 rows.append([rec.code, rec.counter, rec.date, rec.time])
             _copy_tsv(headers, rows)
 
-        parent.addWidget(_section_header("Error History", colors, _copy_error_history))
-
         if not error_records:
             none_lbl = QLabel("No error history available")
             none_lbl.setStyleSheet(
@@ -560,35 +569,50 @@ class WidgetReportView(QWidget):
             parent.addWidget(none_lbl)
             return
 
+        # Container provides the rounded border; global theme handles scrollbar.
+        # Border-radius capped at 6px (matches _scrollbar_radius cap in theme.py)
+        # to prevent the scrollbar from visually collapsing at high corner strength.
+        # QScrollBar:vertical gets a separate tiny border-radius (2px) so the
+        # scrollbar track stays rounded even when the container's border-radius
+        # clips child painting — this avoids the "flip to 90° corners" artifact.
+        container = QWidget()
+        container.setObjectName("ErrorHistoryCard")
+        eh_radius = min(r['md'], 6)
+        container.setStyleSheet(
+            f"QWidget#ErrorHistoryCard {{"
+            f"  background-color: {colors['surface'].name()};"
+            f"  border: 1px solid {colors['border'].name()};"
+            f"  border-radius: {eh_radius}px;"
+            f"}}"
+            f"QScrollBar:vertical {{"
+            f"  border-radius: 2px;"
+            f"}}"
+        )
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+
         table = QTableWidget()
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(["Code", "Counter", "Date", "Time"])
-        table.horizontalHeader().setStretchLastSection(False)
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        table.setColumnWidth(0, 80)
-        table.setColumnWidth(1, 100)
-        table.setColumnWidth(2, 120)
-        table.setColumnWidth(3, 100)
+        table.horizontalHeader().setStretchLastSection(True)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
 
         table.verticalHeader().setVisible(False)
         table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setAlternatingRowColors(False)
         table.setShowGrid(False)
-        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        table.setFixedHeight(len(error_records) * 28 + 30)
+        table.setFixedHeight(300)
 
-        table.setStyleSheet(
-            f"QTableWidget {{"
-            f"  background-color: {colors['surface'].name()};"
-            f"  border: 1px solid {colors['border'].name()};"
-            f"  border-radius: {r['md']}px;"
-            f"  gridline-color: transparent;"
-            f"}}"
+        # Table is borderless — container provides the border + corner rounding.
+        table.setFrameShape(QFrame.Shape.NoFrame)
+        table.horizontalHeader().setStyleSheet(
             f"QHeaderView::section {{"
             f"  background-color: {colors['surface_high'].name()};"
             f"  color: {colors['muted'].name()};"
@@ -630,7 +654,8 @@ class WidgetReportView(QWidget):
 
             table.setRowHeight(i, 28)
 
-        parent.addWidget(table)
+        container_layout.addWidget(table)
+        parent.addWidget(container)
 
     def _build_wear_table(self, parent: QVBoxLayout, data: SingleReportData, colors: dict) -> None:
         r = _corner_radii()
