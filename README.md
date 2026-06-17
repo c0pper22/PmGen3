@@ -5,12 +5,17 @@ PmGen is a Windows desktop application for generating preventive maintenance par
 ## Features
 
 - Single-serial PM report generation from Toshiba eService data.
-- Bulk processing for active serials with background worker threads.
+- Rich widget-based report view with donut chart wear overview and error history display.
+- Bulk processing for active and inactive serials with background worker threads.
+- Named bulk settings profiles for saving/loading/deleting different bulk configurations.
 - Catalog-driven model, PM unit, canon mapping, per-color unit, and quantity override logic.
 - Inventory CSV import, editing, caching, and stock coverage checks.
 - RIBON Access database lookup for PM unit code to part-number resolution.
 - Individual report PDFs and consolidated bulk `Final_Summary.pdf` generation.
-- GitHub-release updater with ZIP checksum validation, safe extraction, install locking, and rollback.
+- Custom 08 and 05 Setting Mode tracking columns in bulk runs.
+- Toshiba device error history fetch and display in reports.
+- Light/dark theme with adjustable window corner rounding.
+- GitHub-release updater with Ed25519 manifest signing, SHA-256 validation, safe extraction, install locking, and rollback.
 - Rolling diagnostic logs for app and updater troubleshooting.
 
 ## Documentation
@@ -77,6 +82,10 @@ Start the desktop app from the repository root so source-mode database lookup ca
 
 In a frozen build, the app bootstraps `catalog_manager.db` into the application AppData directory. In source runs, it uses the working-directory copy directly.
 
+### Rich Report View
+
+By default, PmGen uses a widget-based rich report view with a donut chart wear overview, visual counters, error history table, and color-coded sections. Switch back to plain text output via `Settings > Rich Report View`.
+
 ## Configuration
 
 PmGen stores normal application settings through `QSettings`, saved Toshiba eService credentials through the OS credential store via `keyring`, and diagnostic logs under `~/.indybiz_pm`.
@@ -102,7 +111,13 @@ The rule pipeline is defined in [pmgen/engine/run_rules.py](pmgen/engine/run_rul
 
 ```text
 PmGen/
-|-- build_sign_zip.py          # PyInstaller build, signing, ZIP, and checksum pipeline
+|-- tools/
+|   |-- build_sign_zip.py      # PyInstaller build, signing, ZIP, and manifest pipeline
+|   |-- generate_signing_keys.py  # Ed25519 keypair generator
+|   |-- base64_enc_priv_key.py    # PEM-to-base64 private key encoder
+|-- keys/
+|   |-- signing_private.key    # Ed25519 private key (never commit)
+|   |-- signing_public.key     # Ed25519 public key
 |-- create_database.py         # Catalog seed data and canon mapping source
 |-- catalog_manager.db         # Bundled SQLite catalog
 |-- pmgen.spec                 # PyInstaller spec for app and updater
@@ -112,17 +127,18 @@ PmGen/
 |   |-- catalog/               # Catalog helper models
 |   |-- engine/                # Rule orchestration and report formatting
 |   |-- io/                    # HTTP, SQLite, RIBON, and serial parsing integrations
+|   |-- models/                # Shared data models (ErrorRecord)
 |   |-- parsing/               # PM Support report parser
 |   |-- rules/                 # Maintenance-selection rules
 |   |-- system/                # Logging, crash handlers, PyQt slot wrapper
-|   |-- ui/                    # PyQt6 application and UI workers
+|   |-- ui/                    # PyQt6 application, workers, theme, rich widgets
 |   |-- updater/               # GitHub updater and external install process
 |   |-- types.py               # Shared dataclass contracts
 |-- tests/                     # Regression, UI model, and updater tests
 |-- docs/                      # Project documentation and diagrams
 ```
 
-The `_internal/` directory mirrors packaged runtime content and should generally be treated as generated distribution support.
+The `_internal/` directory mirrors packaged runtime content and should generally be treated as generated distribution support. The `keys/` directory contains signing keypair files that must never be committed to the repository.
 
 ## Tests
 
@@ -149,7 +165,7 @@ The spec file produces two executables:
 For the signed release ZIP and manifest signing workflow, use:
 
 ```powershell
-.\\.venv\\Scripts\\python.exe build_sign_zip.py
+.\.venv\Scripts\python.exe tools\build_sign_zip.py
 ```
 
 The release script:
@@ -162,7 +178,7 @@ The release script:
 
 Requires:
 - `PMGEN_SIGNING_KEY` environment variable set to the base64-encoded Ed25519 32-byte private key.
-- A code-signing PFX at `helpers/IBSCert.pfx`.
+- A code-signing PFX at `helpers/IBSCert.pfx` (never committed).
 - Windows SDK `signtool.exe` on the `PATH` or auto-discovered.
 
 Publish all three artifacts (`PmGen.zip`, `manifest.json`, `manifest.json.sig`) with the GitHub release so the updater can verify downloads.
@@ -172,7 +188,13 @@ Publish all three artifacts (`PmGen.zip`, `manifest.json`, `manifest.json.sig`) 
 To generate a new Ed25519 keypair for release signing:
 
 ```powershell
-.\\.venv\\Scripts\\python.exe generate_signing_keys.py -o keys/
+.\.venv\Scripts\python.exe tools\generate_signing_keys.py -o keys/
+```
+
+This writes `keys/signing_private.key` and `keys/signing_public.key`. To convert the PEM private key to the base64 format needed by `PMGEN_SIGNING_KEY`:
+
+```powershell
+.\.venv\Scripts\python.exe tools\base64_enc_priv_key.py keys\signing_private.key
 ```
 
 Or, using the one-liner:
@@ -182,7 +204,7 @@ python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519
 ```
 
 - Store the **public** key in `pmgen/updater/updater.py` as `SIGNING_PUBLIC_KEY_B64`.
-- Store the **private** key securely (environment variable, key vault, HSM). Never commit it to the repository.
+- Store the **private** key securely (environment variable, key vault, HSM). Never commit it to the repository. The `keys/` directory and `signing_private.key` are in `.gitignore`.
 
 ## Updater
 
@@ -206,7 +228,7 @@ PmGen uses two separate signing systems:
 | System | Purpose | Key type | Location |
 |---|---|---|---|
 | Ed25519 manifest signing | Authenticate update manifests | Ed25519 key pair (32-byte) | Public key embedded in `updater.py`; private key in `PMGEN_SIGNING_KEY` env var |
-| PFX code signing | Sign Windows binaries (EXE/DLL/PYD) | PFX certificate with timestamping | `helpers/IBSCert.pfx`, applied by `build_sign_zip.py` via `signtool.exe` |
+| PFX code signing | Sign Windows binaries (EXE/DLL/PYD) | PFX certificate with timestamping | `helpers/IBSCert.pfx` (never committed), applied by `tools/build_sign_zip.py` via `signtool.exe` |
 
 These systems are independent. The Ed25519 key pair is used only for manifest signing and verification during updates. The PFX certificate is used only at build time for Authenticode code signing of distributed binaries.
 
@@ -224,7 +246,7 @@ All release artifacts are placed in the `final/` directory:
 
 | Variable | Required | Description |
 |---|---|---|
-| `PMGEN_SIGNING_KEY` | Yes (for builds) | Base64-encoded Ed25519 private key (32 bytes raw). Used by `build_sign_zip.py` to sign `manifest.json`. Never commit this value. |
+| `PMGEN_SIGNING_KEY` | Yes (for builds) | Base64-encoded Ed25519 private key (32 bytes raw). Used by `tools/build_sign_zip.py` to sign `manifest.json`. Never commit this value. |
 
 ### State files
 

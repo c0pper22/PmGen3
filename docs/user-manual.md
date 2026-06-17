@@ -1,7 +1,7 @@
 ---
 title: PmGen User Manual
-date: 2026-06-03
-version: 1.0
+date: 2026-06-17
+version: 3.0.0
 audience: PmGen users and service staff
 ---
 
@@ -21,6 +21,9 @@ This manual explains how to use the app, what each screen does, and what the mai
 - [Inventory Tab](#inventory-tab)
 - [Bulk Runs](#bulk-runs)
 - [Bulk Settings Reference](#bulk-settings-reference)
+  - [Custom 08 Tracking](#custom-08-sub-code)
+  - [Custom 05 Tracking](#custom-05-tracking)
+- [Bulk Settings Profiles](#bulk-settings-profiles)
 - [Settings Menu Reference](#settings-menu-reference)
 - [Catalog Editor](#catalog-editor)
 - [Updates](#updates)
@@ -157,6 +160,10 @@ A single report usually includes:
 
 If `Show All Items` is off, the report focuses on due items. If `Show All Items` is on, the report also includes not-due/watch items so you can see more of the machine's PM state.
 
+### Error History
+
+When generating a single report, PmGen automatically fetches the device's error history from Toshiba eService (non-fatal: empty list on failure). In the rich report view, error records appear in a dedicated table with error code, date, time, and counter columns. Common error codes (E712, EB50, etc.) are displayed for inspection. This feature runs automatically and requires no additional configuration.
+
 ## Inventory Tab
 
 The Inventory tab stores local stock data used by report generation and bulk summary checks.
@@ -230,6 +237,7 @@ Bulk run rows include:
 | `Machine State` | `Active` or `Inactive`. |
 | `Unpack Date` | Unpacking date parsed from 08 Setting Mode data when available. |
 | Custom 08 column | Appears only when Custom 08 Tracking is configured. |
+| Custom 05 column | Appears only when Custom 05 Tracking is configured. |
 | `Status` | Current row state: `Queued`, `Processing`, `Done`, `Failed`, or `Filtered`. |
 | `Result` | Highest wear percentage, filter reason, or error text. |
 
@@ -284,6 +292,10 @@ Open `Bulk > Bulk Settings`.
 | `Exclude if OLDER than (Months)` | Filters out machines whose unpacking date is older than the selected number of months. Useful when excluding very old installations. |
 | `Custom 08 Tracking - Column Name` | Adds a custom column to the bulk table for a value parsed from 08 Setting Mode data. Leave blank if not needed. |
 | `Custom 08 Tracking - 08 Code` | The numeric 08 Setting Mode code to read. `0` disables custom 08 tracking. |
+| `Custom 08 Tracking - 08 Sub Code` | The numeric 08 Setting Mode sub code to read. `0` for default/0. |
+| `Custom 05 Tracking - Column Name` | Adds a custom column to the bulk table for a value parsed from 05 Adjustment Mode data. Leave blank if not needed. |
+| `Custom 05 Tracking - 05 Code` | The numeric 05 Adjustment Mode code to read. `0` disables custom 05 tracking. |
+| `Custom 05 Tracking - 05 Sub Code` | The numeric 05 Adjustment Mode sub code to read. `0` default/0. |
 
 Click `Save` to store bulk settings.
 
@@ -292,6 +304,23 @@ Click `Save` to store bulk settings.
 - To skip very new machines, enable `Exclude if NEWER than (Months)` and enter `6`.
 - To skip very old machines, enable `Exclude if OLDER than (Months)` and enter `48`.
 - If no unpacking date is available for a machine, PmGen keeps the row because it cannot evaluate the date filter.
+
+## Bulk Settings Profiles
+
+Profiles let you save, load, and delete named snapshots of all bulk settings. This is useful when you regularly switch between different bulk configurations (e.g., one profile for active machines with PDFs, another for inactive machines without PDFs).
+
+### Profile Controls
+
+Open `Bulk > Bulk Settings`. The profile controls are at the top of the dialog:
+
+| Control | What it does |
+|---|---|
+| Profile drop-down | Selects a saved profile. Changing the selection loads that profile's settings immediately. |
+| `Save As New` | Saves the current settings as a new named profile. Enter a unique name in the prompt. |
+| `Save` | Overwrites the currently selected profile with the current settings. |
+| `Delete` | Deletes the currently selected profile after confirmation. The "Default" profile cannot be deleted. |
+
+A "Default" profile is created automatically the first time you use profiles. The last-used profile is remembered and restored when you reopen Bulk Settings.
 
 ## Settings Menu Reference
 
@@ -304,8 +333,9 @@ Open `Settings` from the top toolbar.
 | `Optional Threshold` | Configures whether items below 100% life can still be treated as due. |
 | `Life Basis` | Chooses whether PM life is evaluated primarily by page counters or drive counters. |
 | `Show All Items` | Toggles whether reports include not-due/watch items in addition to due items. |
-| `Colorized Output` | Toggles color highlighting in the Single tab output. |
-| `Appearance` | Opens display preferences, including the light/dark theme toggle. |
+| `Rich Report View` | Toggles between the widget-based rich report view (with donut chart, error history, and card layout) and the plain text output. |
+| `Colorized Output` | Toggles color highlighting in the Single tab output (text mode only). |
+| `Appearance` | Opens display preferences: light/dark theme toggle and window corner rounding slider. |
 | `Clear Output Window` | Clears the Single tab output. Same as `Ctrl+L`. |
 | `About` | Shows the PmGen version and supported model count/list. |
 | `Catalog Editor` | Opens the catalog editor for models, PM units, canon mappings, per-color units, and quantity overrides. |
@@ -334,9 +364,29 @@ If the selected basis is missing for a report item, PmGen falls back to the othe
 
 When off, reports focus on due items. When on, reports also show non-due/watch items sorted by wear. This is useful for inspection and troubleshooting.
 
+### Rich Report View
+
+When on (default), PmGen displays reports as a rich widget view with:
+
+- A donut chart showing due vs. OK items with the highest wear percentage.
+- Color-coded sections for model info, alerts, counters, error history, wear items, and final parts.
+- Error history table showing recent Toshiba device error codes with dates and counters.
+- Visual wear breakdown with life percentages.
+
+When off, PmGen uses the plain text output view (legacy mode). The setting persists across sessions.
+
 ### Colorized Output
 
-When on, PmGen applies syntax highlighting/coloring to the Single tab report text. Turn it off if you prefer plain output.
+When on, PmGen applies syntax highlighting/coloring to the Single tab report text (text mode only). Turn it off if you prefer plain output. Has no effect when Rich Report View is enabled.
+
+### Appearance
+
+Open `Settings > Appearance` to configure:
+
+| Setting | What it does |
+|---|---|
+| Theme | Toggles between Dark (default) and Light mode. |
+| Corner Roundness | Adjusts window corner rounding from sharp (0) to fully rounded (100). Default is 50. Changes apply immediately. |
 
 ### Enable System Alerts
 
@@ -572,3 +622,11 @@ Save the changed tab or click `Save All`. Dependent tabs refresh from saved cata
 | Per-color unit | A color-specific PM unit that PmGen counts once per due color, even if several items inside that same color unit are due. |
 | Quantity override | A fixed quantity rule for a PM unit. |
 | Bulk final summary | PDF combining the top machines from a bulk run and their selected parts. |
+| Bulk profile | A named snapshot of all bulk settings that can be saved, loaded, and deleted. |
+| Rich report view | The widget-based report display with donut chart, error history, and card layout. |
+| Donut chart | A ring chart in the rich report view showing due vs. OK item counts with center text. |
+| Error history | Toshiba device error codes, dates, and counters fetched automatically during single report generation. |
+| 05 Adjustment Mode | Toshiba service data mode containing technician-applied adjustment values (voltage, registration, fuser offsets, etc.). Identified by numeric codes and optional sub-codes. |
+| Custom 08 Tracking | An optional bulk column for values parsed from 08 Setting Mode data (e.g., firmware version, serial counter). |
+| Custom 05 Tracking | An optional bulk column for values parsed from 05 Adjustment Mode data (e.g., voltage, registration offset). Configured with a column name, numeric 05 code, and optional sub-code. |
+| Corner roundness | Adjustable window corner rounding (0–100) configured in the Appearance dialog. |

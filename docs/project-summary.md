@@ -1,7 +1,7 @@
 ---
 title: PmGen - Project Summary
-date: 2026-05-28
-version: 1.0
+date: 2026-06-17
+version: 3.0.0
 audience: Engineering Team, Architects, Stakeholders
 ---
 
@@ -9,7 +9,7 @@ audience: Engineering Team, Architects, Stakeholders
 
 ## 1. Executive Summary
 
-PmGen is a Windows desktop application for generating preventive maintenance part recommendations from Toshiba e-STUDIO service reports. The application signs into Toshiba eService, downloads PM Support and 08 Setting Mode data for single or bulk device serials, parses wear counters, applies a catalog-driven rules pipeline, and produces text, PDF, and spreadsheet outputs. It uses a bundled SQLite catalog for model-to-unit mappings, an inventory CSV cache for stock checks, and a RIBON Access database lookup to resolve PM unit codes into orderable part numbers. The project is packaged with PyInstaller and includes a self-updater that downloads signed release ZIPs from GitHub and validates SHA-256 checksums before installation.
+PmGen is a Windows desktop application for generating preventive maintenance part recommendations from Toshiba e-STUDIO service reports. The application signs into Toshiba eService, downloads PM Support and 08 Setting Mode data for single or bulk device serials, parses wear counters, applies a catalog-driven rules pipeline, and produces rich widget-based or plain-text outputs, PDF, and spreadsheet exports. It uses a bundled SQLite catalog for model-to-unit mappings, an inventory CSV cache for stock checks, and a RIBON Access database lookup to resolve PM unit codes into orderable part numbers. The project is packaged with PyInstaller and includes a secure self-updater with Ed25519 manifest signing and SHA-256 checksum validation before installation.
 
 ## 2. Architecture Overview
 
@@ -21,9 +21,9 @@ The application boundary is intentionally thick: it owns report parsing, canon n
 
 ### PyQt6 UI Architecture
 
-The desktop UI uses a token-based theme system in `pmgen/ui/theme.py`. `ThemeManager` applies `DARK_QSS` or `LIGHT_QSS`, persists the selected mode in QSettings under `ui/theme_mode`, and keeps dark mode as the default when no saved preference exists.
+The desktop UI uses a token-based theme system in `pmgen/ui/theme.py`. `ThemeManager` applies `DARK_QSS` or `LIGHT_QSS`, persists the selected mode in QSettings under `ui/theme_mode`, and keeps dark mode as the default when no saved preference exists. An adjustable window corner rounding setting (0–100) is available in the Appearance dialog.
 
-Frameless window behavior is centralized in `pmgen/ui/shell.py`, including shared top-bar controls, icon resolution, and edge-resize behavior for both `MainWindow` and `CatalogEditorWindow`. Main dashboard composition lives in page/widget modules: `pmgen/ui/pages.py` builds the Single and Inventory tab wrappers, `pmgen/ui/widgets.py` provides reusable card and table helpers, and `pmgen/ui/bulk_run.py` owns dynamic bulk-run tabs while `pmgen/ui/main_window.py` coordinates application workflows.
+Frameless window behavior is centralized in `pmgen/ui/shell.py`, including shared top-bar controls, icon resolution, and edge-resize behavior for both `MainWindow` and `CatalogEditorWindow`. Main dashboard composition lives in page/widget modules: `pmgen/ui/pages.py` builds the Single and Inventory tab wrappers with stacked text/rich widget views, `pmgen/ui/widgets.py` provides reusable card and table helpers, `pmgen/ui/widget_report.py` implements the rich widget-based report view with donut chart, error history table, and color-coded sections, and `pmgen/ui/bulk_run.py` owns dynamic bulk-run tabs while `pmgen/ui/main_window.py` coordinates application workflows.
 
 ## 3. Processing Pipeline
 
@@ -51,17 +51,21 @@ The final `Selection` object feeds report formatters. Single runs produce format
 | Area | Files | Key components | Notes |
 |---|---|---|---|
 | GUI entry point | `pmgen/ui/app.py` | `main()`, `bootstrap_database()` | Sets application identity, installs diagnostics, applies theme, bootstraps the catalog, and opens `MainWindow`. |
-| Main UI | `pmgen/ui/main_window.py` | `MainWindow`, `BulkRunTab`, `BulkSortFilterProxyModel` | Coordinates auth, single report generation, bulk jobs, inventory tab, catalog editor, and updater UI. |
-| Background work | `pmgen/ui/workers.py` | `SingleReportWorker`, `BulkRunner`, `BulkConfig` | Runs network and report generation work outside the UI thread. |
+| Main UI | `pmgen/ui/main_window.py` | `MainWindow`, `BulkRunTab`, `BulkSortFilterProxyModel` | Coordinates auth, single report generation, bulk jobs, inventory tab, catalog editor, profile management, and updater UI. |
+| Background work | `pmgen/ui/workers.py` | `SingleReportWorker`, `BulkRunner`, `BulkConfig` | Runs network and report generation work outside the UI thread. Fetches error history during single report generation. |
+| Rich report view | `pmgen/ui/widget_report.py`, `pmgen/ui/donut_chart.py` | `WidgetReportView`, `DonutChart` | Renders structured report data as themed cards with a donut chart wear overview, counters, error history, and color-coded sections. |
+| Bulk profiles | `pmgen/ui/profile_store.py` | `save_profile()`, `load_profile()`, `delete_profile()` | Named snapshots of all bulk settings stored in QSettings under `bulk/profiles/`. |
 | Report parsing | `pmgen/parsing/parse_pm_report.py` | `ParsePmReport`, `PmReport`, `PmItem` | Parses CSV-like PM Support report bytes into structured report data. |
 | Rules engine | `pmgen/engine/run_rules.py`, `pmgen/rules/*.py` | `Context`, `RuleBase`, `PIPELINE` | Applies deterministic rules to turn wear data into selected PM units and part numbers. |
-| Reporting | `pmgen/engine/single_report.py`, `pmgen/engine/final_report.py` | `format_report()`, `create_pdf_report()`, `write_final_summary_pdf()` | Generates UI text, individual PDFs, and bulk summary PDFs with ReportLab. |
+| Reporting | `pmgen/engine/single_report.py`, `pmgen/engine/final_report.py` | `format_report()`, `create_pdf_report()`, `build_report_data()` | Generates UI text, structured `SingleReportData`, individual PDFs, and bulk summary PDFs with ReportLab. |
 | Catalog access | `pmgen/io/db_access.py` | `CatalogDB` | Owns SQLite schema creation and CRUD operations for models, units, mappings, overrides, and per-color flags. |
 | Canon normalization | `pmgen/canon/canon_utils.py`, `pmgen/canon/regex_tokens.py` | `canon_unit()`, `expand_regex_tokens()` | Expands regex helper tokens and maps raw descriptors to canonical item names. |
-| HTTP integration | `pmgen/io/http_client.py`, `pmgen/io/fetch_serials.py` | `login()`, `SessionPool`, parser helpers | Authenticates with Toshiba eService, fetches service files, and extracts device lists and metadata. |
+| HTTP integration | `pmgen/io/http_client.py`, `pmgen/io/fetch_serials.py` | `login()`, `SessionPool`, `fetch_error_history()` | Authenticates with Toshiba eService, fetches service files, error history, and extracts device lists and metadata. |
+| Error history | `pmgen/models/error_record.py`, `pmgen/io/http_client.py` | `ErrorRecord`, `parse_error_history_csv()` | Fetches Toshiba device error history CSV and parses into structured records for display. |
 | RIBON lookup | `pmgen/io/ribon_db.py`, `pmgen/engine/resolve_to_pn.py` | `query_parts_rows()`, `resolve_with_rows()` | Uses ODBC to resolve PM unit codes to RIBON part-number rows. |
 | Inventory | `pmgen/ui/inventory.py` | `InventoryTab`, `InventoryModel`, `load_inventory_cache()` | Imports messy CSV exports, normalizes stock data, persists the cache, and supports rule-time stock checks. |
-| Updates | `pmgen/updater/updater.py`, `pmgen/updater/run_update.py` | `UpdateWorker`, `install_update()` | Checks GitHub releases, verifies checksums, extracts safely, stages the updater, and performs rollback-capable install replacement. |
+| Updates | `pmgen/updater/updater.py`, `pmgen/updater/run_update.py` | `UpdateWorker`, `install_update()` | Checks GitHub releases, verifies Ed25519-signed manifests, validates SHA-256 checksums, extracts safely, stages the updater, and performs rollback-capable install replacement. |
+| Build tools | `tools/build_sign_zip.py`, `tools/generate_signing_keys.py`, `tools/base64_enc_priv_key.py` | Build pipeline, key generation, key encoding | Automates PyInstaller build, code signing, ZIP packaging, and Ed25519 manifest signing. |
 
 The main object contracts live in `pmgen/types.py`, while `parse_pm_report.py` also provides parser-compatible classes with matching property names. Rule implementations use duck typing around those properties, which keeps parsing and rule execution loosely coupled.
 
@@ -129,7 +133,7 @@ The bundled SQLite database currently contains 47 models, 72 PM units, 594 model
 
 The production artifact is a Windows PyInstaller distribution built from `pmgen.spec`. The spec creates the main `PmGen` application from `pmgen/ui/app.py`, creates a one-file updater from `pmgen/updater/run_update.py`, includes the catalog database and icon assets, and excludes unused Qt modules to reduce package size.
 
-`build_sign_zip.py` drives the release pipeline. It runs PyInstaller, discovers `signtool.exe` from the Windows SDK, signs generated executables, DLLs, and PYD files, zips `dist/PmGen` into `PmGen.zip`, and writes a SHA-256 sidecar file. The updater expects the GitHub release to publish both the ZIP and matching checksum file.
+`tools/build_sign_zip.py` drives the release pipeline. It runs PyInstaller, discovers `signtool.exe` from the Windows SDK, signs generated executables, DLLs, and PYD files, zips `dist/PmGen` into `PmGen.zip`, creates `final/manifest.json` with SHA-256, size, and version metadata, and signs the manifest with the Ed25519 private key into `final/manifest.json.sig`. The updater expects the GitHub release to publish all three artifacts: the ZIP, the manifest, and the manifest signature.
 
 At runtime, `UpdateWorker` checks `c0pper22/PmGen3` GitHub releases, compares the latest tag with `CURRENT_VERSION`, downloads the ZIP, fetches the checksum sidecar, validates SHA-256, and extracts into a temporary session directory. `perform_restart()` stages an updater executable into temp and launches it with the extracted payload, current install directory, target executable name, parent PID, and session ID. `run_update.py` waits for the parent process, acquires an install lock, validates the payload root, preserves local database files, replaces `_internal`, copies top-level files, prunes stale runtime files, and rolls back on failure.
 
@@ -196,7 +200,13 @@ The UI export path writes Excel files through pandas with the `openpyxl` engine,
 
 ```text
 PmGen/
-|-- build_sign_zip.py          # PyInstaller build, recursive signing, ZIP and checksum creation
+|-- tools/
+|   |-- build_sign_zip.py      # PyInstaller build, recursive signing, ZIP, and manifest creation
+|   |-- generate_signing_keys.py  # Ed25519 keypair generator
+|   |-- base64_enc_priv_key.py    # PEM-to-base64 private key encoder
+|-- keys/
+|   |-- signing_private.key    # Ed25519 private key (never commit)
+|   |-- signing_public.key     # Ed25519 public key
 |-- create_database.py         # Catalog seed data and canon mapping source
 |-- catalog_manager.db         # Bundled SQLite catalog used by rules and catalog editor
 |-- pmgen.spec                 # PyInstaller build specification for app and updater
@@ -206,10 +216,11 @@ PmGen/
 |   |-- catalog/               # Lightweight catalog model helpers
 |   |-- engine/                # Rule orchestration, report formatting, part-number resolution
 |   |-- io/                    # HTTP, SQLite, RIBON Access, and serial parsing integrations
+|   |-- models/                # Shared data models (ErrorRecord)
 |   |-- parsing/               # PM Support report parser
 |   |-- rules/                 # RuleBase and concrete maintenance-selection rules
 |   |-- system/                # Logging, crash handlers, safe PyQt slot wrapper
-|   |-- ui/                    # PyQt6 application, windows, widgets, workers, inventory, theme
+|   |-- ui/                    # PyQt6 application, windows, widgets, workers, inventory, theme, profiles
 |   |-- updater/               # GitHub updater worker and external installer process
 |   |-- types.py               # Dataclass contracts shared by engine and rules
 |-- tests/
@@ -222,4 +233,4 @@ PmGen/
 |   |-- diagrams/              # Editable draw.io diagrams and exported PNGs
 ```
 
-The active source package is `pmgen/`. The `_internal/` directory in the workspace mirrors packaged runtime content and should be treated as generated or distribution support unless a build process explicitly requires changes there.
+The active source package is `pmgen/`. The `_internal/` directory in the workspace mirrors packaged runtime content and should be treated as generated or distribution support unless a build process explicitly requires changes there. The `keys/` directory contains signing keypair files that must never be committed to the repository.
