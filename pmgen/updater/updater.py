@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-GITHUB_REPO = "c0pper22/PmGen"
+GITHUB_REPO = "c0pper22/PmGen3"
 ASSET_NAME = "PmGen.zip"
 CURRENT_VERSION = "2.9.9"
 USER_AGENT = f"PmGen-Updater/{CURRENT_VERSION}"
@@ -49,7 +49,7 @@ UPDATE_STATE_FILE = Path.home() / ".indybiz_pm" / "update_state.json"
 
 # PLACEHOLDER — replace with the real Ed25519 public key (base64-encoded)
 # before distributing signed releases.
-SIGNING_PUBLIC_KEY_B64 = "HGJoM2+n+jEKhMZQLyaoy6LcGszs8X8FtiU6Gy2ITX4="
+SIGNING_PUBLIC_KEY_B64 = "7eRA/6NfuOHUgRje6SGSH25vKeV08tuhA1RP5rojiVs="
 
 # Module-level shared state — needed because check and download may run on
 # separate UpdateWorker instances in different QThreads.
