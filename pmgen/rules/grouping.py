@@ -1,6 +1,6 @@
 from pmgen.rules.base import RuleBase, Context
 import re
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, Optional, Tuple, Set
 from pmgen.io.db_access import CatalogDB 
 
 # ---------------------------

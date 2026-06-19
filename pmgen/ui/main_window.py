@@ -1,42 +1,39 @@
 from __future__ import annotations
-import sys, os, re
+import sys
+import os
+import re
 import shutil
 import requests
 import logging
 from typing import Dict
-from collections import deque
 from datetime import datetime
 from PyQt6.QtCore import (
-    Qt, QSize, QPoint, QRect, QEvent, QRegularExpression,
-    QCoreApplication, QSettings, QThread, pyqtSlot, QTimer, pyqtSignal,
-    QSortFilterProxyModel, QModelIndex, QObject
+    Qt, QEvent, QSettings, QThread, pyqtSlot, QTimer, pyqtSignal,
+    QObject
 )
 from PyQt6.QtGui import (
-    QAction, QIcon, QCursor, QRegularExpressionValidator, QKeySequence, 
-    QShortcut, QTextCursor 
+    QIcon, QKeySequence, 
+    QShortcut 
 )
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QPlainTextEdit,
-    QToolBar, QSizePolicy, QToolButton, QHBoxLayout, QLabel, QMenu,
-    QPushButton, QLineEdit, QComboBox, QCheckBox, QSlider, 
-    QSpinBox, QDoubleSpinBox, QFileDialog, QProgressBar, QCompleter,
-    QTabWidget, QTableView, QHeaderView, QSplitter, QTabBar, QGridLayout,
-    QProgressDialog, QTableWidget, QTableWidgetItem, QAbstractItemView
+    QSizePolicy, QHBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QCheckBox, QSlider, 
+    QSpinBox, QDoubleSpinBox, QFileDialog, QProgressBar, QGridLayout,
+    QTableWidget, QTableWidgetItem, QAbstractItemView
 )
 
 # Imports from our new split files
-from pmgen.ui.bulk_model import BulkQueueModel
 from pmgen.system.wrappers import safe_slot
-from .theme import SPACING_LG, SPACING_MD, apply_static_theme
+from .theme import SPACING_LG, SPACING_MD
 from .theme import (
     RADIUS_LG, CORNER_ROUNDNESS_KEY, CORNER_ROUNDNESS_DEFAULT,
     _corner_scale, _scaled_radius,
 )
 from .components import (
-    DragRegion, TitleDragLabel, FramelessDialog, CustomMessageBox, ResizeState, LoadingDialog
+    FramelessDialog, CustomMessageBox, ResizeState, LoadingDialog
 )
 from .highlighter import OutputHighlighter
-from .workers import BulkConfig, BulkRunner, SingleReportWorker
+from .workers import BulkConfig, SingleReportWorker
 from .profile_store import (
     DEFAULT_PROFILE_NAME,
     list_profile_names,
@@ -49,7 +46,7 @@ from .profile_store import (
 from pmgen.io.db_access import CatalogDB
 from pmgen.io.http_client import get_customer_map_after_login
 from pmgen.updater.updater import UpdateWorker, perform_restart, CURRENT_VERSION
-from .inventory import InventoryTab
+from pmgen.io.ribon_update_check import RibonCheckWorker
 from .factory import UIFactory
 from .catalog_editor import CatalogEditorWindow
 from .pages import DashboardTabs, InventoryPage, SingleReportPage
@@ -68,7 +65,7 @@ BULK_MACHINE_FILTER_KEY = "bulk/machine_filter"
 
 
 # Compatibility exports for callers that import these classes from this module.
-from .bulk_run import BulkRunTab, BulkSortFilterProxyModel
+from .bulk_run import BulkRunTab
 
 
 # =============================================================================
@@ -206,6 +203,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self._update_worker: UpdateWorker | None = None
         self._update_silent_mode = False
 
+        # RIBON DB CHECK STATE
+        self._ribon_check_thread: QThread | None = None
+        self._ribon_check_worker: RibonCheckWorker | None = None
+
         # Shortcuts
         clear_shortcut = QShortcut(QKeySequence("Ctrl+L"), self)
         clear_shortcut.activated.connect(self._clear_output_window)
@@ -216,6 +217,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         QTimer.singleShot(500, self._attempt_auto_login)
 
         QTimer.singleShot(1500, lambda: self._start_update_check(silent=True))
+        QTimer.singleShot(3000, self._start_ribon_check)
 
         # Apply initial window corner rounding from saved preference
         self.apply_window_roundness(self._get_corner_roundness())
@@ -445,6 +447,58 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             """
             self._update_thread = None
             self._update_worker = None
+
+    # =========================================================================
+    #  RIBON Database Freshness Check
+    # =========================================================================
+
+    def _start_ribon_check(self) -> None:
+        """Check whether the RIBON.accdb data is up to date.
+
+        Runs on a background thread.  Only shows a warning when an update is
+        confirmed available.  Silently logs other outcomes (DB not found,
+        web service unreachable, etc.) since those are expected in some
+        environments.
+        """
+        self._ribon_check_thread = QThread()
+        self._ribon_check_worker = RibonCheckWorker()
+        self._ribon_check_worker.moveToThread(self._ribon_check_thread)
+
+        self._ribon_check_thread.started.connect(self._ribon_check_worker.run_check)
+        self._ribon_check_worker.check_finished.connect(self._on_ribon_check_finished)
+        self._ribon_check_worker.check_finished.connect(self._ribon_check_thread.quit)
+        self._ribon_check_thread.finished.connect(self._ribon_check_thread.deleteLater)
+        self._ribon_check_thread.finished.connect(self._reset_ribon_check_thread)
+
+        self._ribon_check_thread.start()
+
+    def _reset_ribon_check_thread(self) -> None:
+        """Clear stale references so we don't touch deleted C++ objects."""
+        self._ribon_check_thread = None
+        self._ribon_check_worker = None
+
+    @pyqtSlot(bool, object)
+    def _on_ribon_check_finished(self, update_available: bool, result: object) -> None:
+        """Handle the RIBON check result on the main thread."""
+        if update_available:
+            remote_ver = result.get("remote_version", "?")
+            local_ver = result.get("local_version", "?")
+            CustomMessageBox.warn(
+                self,
+                "RIBON Database Update Available",
+                f"The RIBON parts database is out of date.\n\n"
+                f"Your version:  {local_ver}\n"
+                f"New version:   {remote_ver}\n\n"
+                f"Please run RIBON.exe to update the database before "
+                f"generating reports to ensure accurate part numbers.",
+                self._icon_dir,
+            )
+        else:
+            error = result.get("error")
+            if error:
+                logging.info("RIBON check completed with status: %s", error)
+            else:
+                logging.info("RIBON database is up to date (%s)", result.get("local_version"))
 
     def _start_update_check(self, silent=False):
         """

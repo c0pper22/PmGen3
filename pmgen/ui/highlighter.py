@@ -1,6 +1,5 @@
 import re
 from PyQt6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
-from PyQt6.QtCore import Qt
 from pmgen.ui.theme import OUTPUT_HIGHLIGHT_COLORS
 
 class OutputHighlighter(QSyntaxHighlighter):

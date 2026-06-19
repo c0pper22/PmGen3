@@ -1,16 +1,14 @@
 from __future__ import annotations
-import os
 import sys
-from PyQt6.QtCore import Qt, QSize, QRegularExpression
-from PyQt6.QtGui import QAction, QIcon, QRegularExpressionValidator
+from PyQt6.QtCore import Qt, QRegularExpression
+from PyQt6.QtGui import QAction, QRegularExpressionValidator
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QToolBar, QSizePolicy, QToolButton, 
+    QWidget, QToolBar, QToolButton, 
     QHBoxLayout, QLabel, QMenu, QPushButton, QComboBox, 
-    QCompleter, QLineEdit
+    QCompleter
 )
 
-from pmgen.system.wrappers import safe_slot
-from .components import DragRegion, TitleDragLabel, CustomMessageBox
+from .components import CustomMessageBox
 from .shell import WindowControlSpec, build_frameless_top_bar
 from .theme import SPACING_MD, SPACING_SM
 from pmgen.updater.updater import CURRENT_VERSION

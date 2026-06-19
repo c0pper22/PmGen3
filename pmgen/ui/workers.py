@@ -4,7 +4,7 @@ import traceback
 from fnmatch import fnmatchcase
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_08_bytes, _parse_code_from_csv_bytes, get_unpacking_date
+from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_csv_bytes, get_unpacking_date
 from pmgen.engine.single_report import generate_from_bytes, build_report_data
 from datetime import datetime, date
 import calendar
@@ -226,7 +226,7 @@ class BulkRunner(QObject):
                     counter += 1
                 os.makedirs(final_out_dir, exist_ok=True)
 
-            from pmgen.io.http_client import SessionPool, get_serial_status_map_after_login, get_service_file_bytes, get_unpacking_date
+            from pmgen.io.http_client import SessionPool, get_serial_status_map_after_login, get_service_file_bytes
             from pmgen.parsing.parse_pm_report import parse_pm_report
             from pmgen.engine.run_rules import run_rules
             from pmgen.engine.single_report import create_pdf_report

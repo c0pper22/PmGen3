@@ -438,7 +438,7 @@ def check_for_update(
             f"Cannot reach web service at {ws_url}: {exc}"
         )
         return result
-    except requests.exceptions.Timeout as exc:
+    except requests.exceptions.Timeout:
         result["error"] = f"Web service timed out after {timeout}s"
         return result
     except Exception as exc:

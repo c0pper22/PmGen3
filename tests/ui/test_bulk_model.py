@@ -1,4 +1,3 @@
-import pytest
 from PyQt6.QtCore import Qt
 from pmgen.ui.bulk_model import BulkQueueModel
 

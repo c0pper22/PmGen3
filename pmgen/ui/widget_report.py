@@ -188,7 +188,7 @@ class _WearBar(QWidget):
         self.setMinimumWidth(80)
 
     def paintEvent(self, event) -> None:
-        from PyQt6.QtGui import QPainter, QColor
+        from PyQt6.QtGui import QPainter
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)

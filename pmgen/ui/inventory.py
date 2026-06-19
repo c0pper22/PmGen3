@@ -2,12 +2,11 @@ import os
 import io
 import numpy as np
 import pandas as pd
-import logging
 from pmgen.system.wrappers import safe_slot
 from PyQt6.QtCore import Qt, QAbstractTableModel, QStandardPaths, QModelIndex
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-    QTableView, QFileDialog, QHeaderView, QApplication, QMessageBox
+    QTableView, QFileDialog, QHeaderView, QApplication
 )
 
 from .components import CustomMessageBox

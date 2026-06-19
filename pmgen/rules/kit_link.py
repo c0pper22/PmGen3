@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable
 from pmgen.rules.base import Context, RuleBase
 from pmgen.io.db_access import CatalogDB
 
