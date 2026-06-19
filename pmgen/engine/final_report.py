@@ -212,8 +212,8 @@ def write_final_summary_pdf(
     styles.add(ParagraphStyle(name="TOCLink", parent=styles["BodyText"], fontName="Helvetica", fontSize=10, textColor=colors.blue, alignment=1)) # 1=Center
 
     # --- 1. PRE-CALCULATION ---
-    total_over_upn = {}
-    total_thr_upn = {}
+    total_over_upn: dict[tuple[str, str], int] = {}
+    total_thr_upn: dict[tuple[str, str], int] = {}
     individual_serials_story = [] 
     toc_data = []
 

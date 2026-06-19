@@ -94,7 +94,7 @@ class BulkConfig:
     top_n: int = 25
     out_dir: str = ""
     pool_size: int = 4
-    blacklist: list[str] = None
+    blacklist: list[str] | None = None
     show_all: bool = False
     custom_08_name: str = ""
     custom_08_code: int = 0
@@ -145,9 +145,9 @@ class BulkRunner(QObject):
             if str(serial).strip()
         }
 
-        self._blacklist = [p.upper() for p in (cfg.blacklist or [])]
+        self._blacklist: list[str] = [p.upper() for p in (cfg.blacklist or [])]
 
-        self._unpack_max_enabled = bool(unpack_max_enabled)
+        self._unpack_max_enabled: bool = bool(unpack_max_enabled)
         self._unpack_max_months = max(0, min(120, int(unpack_max_months)))
         self._unpack_min_enabled = bool(unpack_min_enabled)
         self._unpack_min_months = max(0, min(120, int(unpack_min_months)))
@@ -333,7 +333,7 @@ class BulkRunner(QObject):
                     d_str = unpack_date.strftime("%Y-%m-%d") if unpack_date else ""
 
                     # C. Check Date Filter
-                    filter_reason = self._check_date_filter(unpack_date)
+                    filter_reason = self._check_date_filter(unpack_date)  # type: ignore[arg-type]
 
                     if filter_reason:
                         # FILTERED: Update UI with percentage, but mark as filtered.

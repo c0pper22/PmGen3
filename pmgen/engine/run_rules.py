@@ -38,7 +38,7 @@ def build_context(
     return Context(
         report=report,
         model=model,
-        counters=counters,
+        counters=counters,  # type: ignore[arg-type]
         items_by_canon=dict(items_by_canon),
         threshold=threshold,
         life_basis=life_basis,
@@ -56,7 +56,7 @@ def run_rules(report, threshold, life_basis, threshold_enabled=True) -> Selectio
             ctx.optional_alerts.append(f"Internal Error: Rule {rule.name} failed.")
 
     due = [f for f in ctx.findings.values() if f.due]
-    watch = [f for f in ctx.findings.values() if not f.due and f.life_used > 0.95]
+    watch = [f for f in ctx.findings.values() if not f.due and (f.life_used or 0.0) > 0.95]
         
     ctx.meta["watch"] = watch
     ctx.meta["all_items"] = list(ctx.findings.values())
@@ -65,6 +65,6 @@ def run_rules(report, threshold, life_basis, threshold_enabled=True) -> Selectio
     
     return Selection(
         items=due, 
-        kits=ctx.kit_selection,
+        kits=ctx.kit_selection,  # type: ignore[arg-type]
         meta=ctx.meta 
     )

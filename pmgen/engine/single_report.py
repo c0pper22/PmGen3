@@ -612,7 +612,7 @@ def generate_from_bytes(
     alerts_enabled: bool = True,
     customer_name: str = "",
 ) -> str:
-    report: PmReport = parse_pm_report(pm_pdf_bytes)
+    report = parse_pm_report(pm_pdf_bytes)
     selection = run_rules(
         report,
         threshold=threshold,

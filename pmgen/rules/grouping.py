@@ -86,8 +86,8 @@ class UnitGroupingRule(RuleBase):
         return self._PER_COLOR_CACHE
 
     def apply(self, ctx: Context) -> None:
-        seen_buckets = set()
-        selection = {}
+        seen_buckets: set[tuple[str, str, str]] = set()
+        selection: dict[str, int] = {}
         per_color_units = self._get_per_color_units()
 
         for finding in ctx.findings.values():
@@ -104,7 +104,7 @@ class UnitGroupingRule(RuleBase):
                 continue
 
             seen_buckets.add(bucket_key)
-            selection[kit] = selection.get(kit, 0) + 1
+            selection[kit] = selection.get(kit, 0) + 1  # type: ignore[index,arg-type]
 
         # Deduplication removes sub-kits if a super-kit covering them is already selected
         self._apply_db_deduplication(selection)

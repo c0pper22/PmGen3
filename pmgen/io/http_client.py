@@ -44,7 +44,7 @@ HEADERS_COMMON = {
 try:
     import keyring  # type: ignore
 except Exception:  # pragma: no cover
-    keyring = None
+    keyring = None  # type: ignore[assignment]
 
 def get_db_path():
     """

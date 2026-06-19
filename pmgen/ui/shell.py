@@ -88,14 +88,14 @@ def build_frameless_top_bar(window: QMainWindow, spec: WindowControlSpec) -> QWi
     btn_min.setFixedSize(36, 36)
     btn_min.setDefaultAction(_icon_action(spec.icon_dir, "minimize.svg", "Minimize", window, spec.on_minimize))
 
-    window._act_full = QAction("Maximize", window)
-    set_themed_icon(window._act_full, "fullscreen", spec.icon_dir)
-    window._act_full.setCheckable(True)
-    window._act_full.triggered.connect(spec.on_toggle_fullscreen)
+    window._act_full = QAction("Maximize", window)  # type: ignore[attr-defined]
+    set_themed_icon(window._act_full, "fullscreen", spec.icon_dir)  # type: ignore[attr-defined]
+    window._act_full.setCheckable(True)  # type: ignore[attr-defined]
+    window._act_full.triggered.connect(spec.on_toggle_fullscreen)  # type: ignore[attr-defined]
     btn_full = QToolButton(controls)
     btn_full.setObjectName("DialogBtn")
     btn_full.setFixedSize(36, 36)
-    btn_full.setDefaultAction(window._act_full)
+    btn_full.setDefaultAction(window._act_full)  # type: ignore[attr-defined]
 
     btn_close = QToolButton(controls)
     btn_close.setObjectName("DialogBtn")
@@ -114,9 +114,17 @@ def build_frameless_top_bar(window: QMainWindow, spec: WindowControlSpec) -> QWi
 
 
 class WindowResizeMixin:
+    """Mixin that adds frameless-window resize handling to a QMainWindow.
+
+    All ``type: ignore[attr-defined]`` annotations below are intentional:
+    this mixin is only ever used with ``QMainWindow`` subclasses, so
+    attributes like ``mapFromGlobal``, ``rect``, ``isFullScreen``, etc.
+    are guaranteed to exist at runtime.
+    """
+
     def _edge_flags_at_pos(self, pos_global: QPoint):
-        pos = self.mapFromGlobal(pos_global)
-        rect = self.rect()
+        pos = self.mapFromGlobal(pos_global)  # type: ignore[attr-defined]
+        rect = self.rect()  # type: ignore[attr-defined]
         return (
             pos.x() <= BORDER_WIDTH,
             pos.x() >= rect.width() - BORDER_WIDTH,
@@ -125,20 +133,20 @@ class WindowResizeMixin:
         )
 
     def _update_cursor(self, pos_global: QPoint) -> None:
-        if self.isFullScreen():
-            self.unsetCursor()
+        if self.isFullScreen():  # type: ignore[attr-defined]
+            self.unsetCursor()  # type: ignore[attr-defined]
             return
         left, right, top, bottom = self._edge_flags_at_pos(pos_global)
         if (left and top) or (right and bottom):
-            self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+            self.setCursor(Qt.CursorShape.SizeFDiagCursor)  # type: ignore[attr-defined]
         elif (right and top) or (left and bottom):
-            self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+            self.setCursor(Qt.CursorShape.SizeBDiagCursor)  # type: ignore[attr-defined]
         elif left or right:
-            self.setCursor(Qt.CursorShape.SizeHorCursor)
+            self.setCursor(Qt.CursorShape.SizeHorCursor)  # type: ignore[attr-defined]
         elif top or bottom:
-            self.setCursor(Qt.CursorShape.SizeVerCursor)
+            self.setCursor(Qt.CursorShape.SizeVerCursor)  # type: ignore[attr-defined]
         else:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
+            self.setCursor(Qt.CursorShape.ArrowCursor)  # type: ignore[attr-defined]
 
     def eventFilter(self, obj, event):
         if not self.isFullScreen() and event.type() in (
@@ -226,16 +234,16 @@ class WindowResizeMixin:
         """Apply a rounded-rect mask to this frameless window."""
         if strength is None:
             strength = self._read_corner_strength()
-        if self.isMaximized() or self.isFullScreen():
-            self.clearMask()
+        if self.isMaximized() or self.isFullScreen():  # type: ignore[attr-defined]
+            self.clearMask()  # type: ignore[attr-defined]
             return
         radius = self._corner_radius_px(strength)
         if radius <= 0:
-            self.clearMask()
+            self.clearMask()  # type: ignore[attr-defined]
             return
         path = QPainterPath()
-        path.addRoundedRect(0, 0, self.width(), self.height(), radius, radius)
-        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+        path.addRoundedRect(0, 0, self.width(), self.height(), radius, radius)  # type: ignore[attr-defined]
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))  # type: ignore[attr-defined]
 
     def resizeEvent(self, event):
         """Re-apply the rounded mask on resize (debounced to 60 fps)."""

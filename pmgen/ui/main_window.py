@@ -424,9 +424,9 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         QSettings().setValue(self.HISTORY_KEY, [self._id_combo.itemText(i) for i in range(self._id_combo.count())])
 
     def _set_history(self, items: list[str]):
-        self._id_combo.clear()
+        self._id_combo.clear()  # type: ignore[attr-defined]
         for it in items:
-            self._id_combo.addItem(it)
+            self._id_combo.addItem(it)  # type: ignore[attr-defined]
 
     def _upsert_id_history(self, serial: str) -> str:
         """Adds a serial to history, keeping newest-first order and a fixed max size."""
@@ -437,8 +437,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         items = [normalized]
         seen = {normalized}
 
-        for i in range(self._id_combo.count()):
-            existing = (self._id_combo.itemText(i) or "").strip().upper()
+        for i in range(self._id_combo.count()):  # type: ignore[attr-defined]
+            existing = (self._id_combo.itemText(i) or "").strip().upper()  # type: ignore[attr-defined]
             if not existing or existing in seen:
                 continue
             seen.add(existing)
@@ -447,7 +447,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                 break
 
         self._set_history(items)
-        self._id_combo.setEditText(normalized)
+        self._id_combo.setEditText(normalized)  # type: ignore[attr-defined]
         self._save_id_history()
         return normalized
 
@@ -492,8 +492,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     def _on_ribon_check_finished(self, update_available: bool, result: object) -> None:
         """Handle the RIBON check result on the main thread."""
         if update_available:
-            remote_ver = result.get("remote_version", "?")
-            local_ver = result.get("local_version", "?")
+            remote_ver = result.get("remote_version", "?")  # type: ignore[attr-defined]
+            local_ver = result.get("local_version", "?")  # type: ignore[attr-defined]
             CustomMessageBox.warn(
                 self,
                 "RIBON Database Update Available",
@@ -505,11 +505,11 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                 self._icon_dir,
             )
         else:
-            error = result.get("error")
+            error = result.get("error")  # type: ignore[attr-defined]
             if error:
                 logging.info("RIBON check completed with status: %s", error)
             else:
-                logging.info("RIBON database is up to date (%s)", result.get("local_version"))
+                logging.info("RIBON database is up to date (%s)", result.get("local_version"))  # type: ignore[attr-defined]
 
     def _start_update_check(self, silent=False):
         """
@@ -738,7 +738,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self._update_basis_button()
 
     def _auto_capitalize(self, text: str):
-        le = self._id_combo.lineEdit()
+        le = self._id_combo.lineEdit()  # type: ignore[attr-defined]
         cursor = le.cursorPosition()
         le.blockSignals(True)
         le.setText(text.upper())

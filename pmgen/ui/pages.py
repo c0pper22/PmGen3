@@ -40,8 +40,8 @@ class SingleReportPage(QWidget):
         layout.setSpacing(SPACING_MD)
 
         factory = UIFactory(icon_dir)
-        window._secondary_bar = factory.create_secondary_bar(window)
-        layout.addWidget(window._secondary_bar, 0)
+        window._secondary_bar = factory.create_secondary_bar(window)  # type: ignore[attr-defined]
+        layout.addWidget(window._secondary_bar, 0)  # type: ignore[attr-defined]
 
         # Stacked widget to switch between text and rich widget views
         self._stack = QStackedWidget()
@@ -61,7 +61,7 @@ class SingleReportPage(QWidget):
 
         # Always expose the editor on the window for backward compat
         window.editor = self._editor
-        window._widget_view = self._widget_view
+        window._widget_view = self._widget_view  # type: ignore[attr-defined]
 
         # Apply initial view mode from settings
         mode = QSettings().value(REPORT_STYLE_KEY, "widget", str)
@@ -107,11 +107,15 @@ class DashboardTabs(QTabWidget):
         btn.setProperty("class", "tab-close")
         btn.clicked.connect(lambda _checked=False, i=index: self.tabCloseRequested.emit(i))
         set_themed_icon(btn, "exit", _icon_dir())
-        self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, btn)
+        tab_bar = self.tabBar()
+        if tab_bar is not None:
+            tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, btn)
 
     def add_pinned_tab(self, widget: QWidget, title: str) -> int:
         index = self.addTab(widget, title)
-        self.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
+        tab_bar = self.tabBar()
+        if tab_bar is not None:
+            tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
         return index
 
 

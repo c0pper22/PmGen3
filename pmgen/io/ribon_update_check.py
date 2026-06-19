@@ -299,7 +299,7 @@ def run_ribon_check(db_path: str = RIBON_DB_PATH, timeout: int = 15) -> dict[str
 
     try:
         info = _read_setup_info_isolated(db_path)
-        key_ver, sub_ver = _parse_version(info["current_data_version"])
+        key_ver, sub_ver = _parse_version(info["current_data_version"] or "")
         result["local_version"] = f"{key_ver}.{sub_ver}"
         logger.info("Read RIBON local version: %s", result["local_version"])
     except FileNotFoundError:
@@ -316,8 +316,8 @@ def run_ribon_check(db_path: str = RIBON_DB_PATH, timeout: int = 15) -> dict[str
         remote = _call_check_version(
             key_version=key_ver,
             data_sub_version=sub_ver,
-            bsi_flg=info["bsi_flg"],
-            country_type=info["country_type"],
+            bsi_flg=info["bsi_flg"] or "",
+            country_type=info["country_type"] or "",
             install_key=info["current_install_key"],
             ws_url=DEFAULT_WS_URL,
             timeout=timeout,

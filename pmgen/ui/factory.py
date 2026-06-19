@@ -139,7 +139,7 @@ class UIFactory:
                 on_update=_on_update,
             ),
         )
-        h = bar.layout()
+        h_obj = bar.layout()
         nav = QWidget(bar)
         nav.setObjectName("TopBarNav")
         nav_l = QHBoxLayout(nav)
@@ -147,7 +147,8 @@ class UIFactory:
         nav_l.setSpacing(SPACING_SM)
         nav_l.addWidget(settings_btn)
         nav_l.addWidget(bulk_btn)
-        h.insertWidget(0, nav, 0)
+        if h_obj is not None:
+            h_obj.insertWidget(0, nav, 0)  # type: ignore[attr-defined]
 
         tb.addWidget(bar)
         return tb
@@ -201,7 +202,9 @@ class UIFactory:
         completer = QCompleter(window._id_combo.model(), window._id_combo)
         completer.setFilterMode(Qt.MatchFlag.MatchContains)
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        completer.popup().setObjectName("IdCompleterPopup")
+        popup = completer.popup()
+        if popup is not None:
+            popup.setObjectName("IdCompleterPopup")
         window._id_combo.setCompleter(completer)
 
         window._load_id_history()

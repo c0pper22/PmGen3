@@ -214,7 +214,7 @@ class CustomMessageBox(FramelessDialog):
         lbl.setWordWrap(True)
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        self._clicked_role = None
+        self._clicked_role: str | None = None
         for label, role in buttons:
             b = QPushButton(label, self._content)
             b.clicked.connect(lambda _=False, r=role: self._finish(r))

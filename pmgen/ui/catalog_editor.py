@@ -85,8 +85,12 @@ class CanonMappingsTab(_EditorTabBase):
         self.table.setHorizontalHeaderLabels(["ID", "Pattern", "Template"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.verticalHeader().setVisible(False)
+        hh = self.table.horizontalHeader()
+        if hh is not None:
+            hh.setStretchLastSection(True)
+        vh = self.table.verticalHeader()
+        if vh is not None:
+            vh.setVisible(False)
         self.table.setColumnWidth(0, 80)
         self.table.setColumnWidth(1, 420)
         self.table.itemChanged.connect(self._on_item_changed)
@@ -105,8 +109,12 @@ class CanonMappingsTab(_EditorTabBase):
         self.token_table.setHorizontalHeaderLabels(["Token", "Regex", "Meaning"])
         self.token_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.token_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.token_table.verticalHeader().setVisible(False)
-        self.token_table.horizontalHeader().setStretchLastSection(True)
+        th = self.token_table.verticalHeader()
+        if th is not None:
+            th.setVisible(False)
+        thh = self.token_table.horizontalHeader()
+        if thh is not None:
+            thh.setStretchLastSection(True)
         self.token_table.setColumnWidth(0, 170)
         self.token_table.setColumnWidth(1, 260)
         self.token_table.setMaximumHeight(150)
@@ -205,8 +213,10 @@ class CanonMappingsTab(_EditorTabBase):
         return fields, invalid_fields
 
     def _get_row_data(self, row: int) -> Tuple[str, str]:
-        pattern = (self.table.item(row, 1).text() if self.table.item(row, 1) else "").strip()
-        template = (self.table.item(row, 2).text() if self.table.item(row, 2) else "").strip()
+        pi = self.table.item(row, 1)
+        pattern = (pi.text() if pi else "").strip()  # type: ignore[union-attr]
+        ti = self.table.item(row, 2)
+        template = (ti.text() if ti else "").strip()  # type: ignore[union-attr]
         return pattern, template
 
     def _delete_selected(self):
@@ -418,9 +428,18 @@ class ModelsTab(_EditorTabBase):
         self.model_table.setHorizontalHeaderLabels(["Original", "Model"])
         self.model_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.model_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.model_table.verticalHeader().setVisible(False)
+        vmh = self.model_table.verticalHeader()
+        if vmh is not None:
+            vmh.setVisible(False)
         self.model_table.setColumnHidden(0, True)
-        self.model_table.horizontalHeader().setStretchLastSection(True)
+        hmh = self.model_table.horizontalHeader()
+        if hmh is not None:
+            hmh.setStretchLastSection(True)
+        hmh = self.model_table.horizontalHeader()
+
+        if hmh is not None:
+
+            hmh.setStretchLastSection(True)
         self.model_table.currentCellChanged.connect(self._on_model_selected)
         self.model_table.itemChanged.connect(self._on_model_changed)
 
@@ -466,7 +485,7 @@ class ModelsTab(_EditorTabBase):
     def _on_model_changed(self, item: QTableWidgetItem):
         if self._loading or item.column() != 1:
             return
-        item.setText((item.text() or "").upper().strip())
+        item.setText((item.text() or "").upper().strip())  # type: ignore[union-attr]
         self._set_dirty(True)
 
     def _on_model_selected(self, *_args):
@@ -530,8 +549,8 @@ class ModelsTab(_EditorTabBase):
         selected: Set[str] = set()
         for i in range(self.unit_checks.count()):
             itm = self.unit_checks.item(i)
-            if itm.checkState() == Qt.CheckState.Checked:
-                selected.add(itm.text())
+            if itm.checkState() == Qt.CheckState.Checked:  # type: ignore[union-attr]
+                selected.add(itm.text())  # type: ignore[union-attr]
         self._set_row_units(row, selected)
         self._set_dirty(True)
 
@@ -560,7 +579,8 @@ class ModelsTab(_EditorTabBase):
     def _validate(self) -> Optional[str]:
         seen: Set[str] = set()
         for row in range(self.model_table.rowCount()):
-            model = (self.model_table.item(row, 1).text() if self.model_table.item(row, 1) else "").upper().strip()
+            mi = self.model_table.item(row, 1)
+            model = (mi.text() if mi else "").upper().strip()  # type: ignore[union-attr]
             if not model:
                 return f"Row {row + 1}: Model name is required."
             if model in seen:
@@ -627,9 +647,13 @@ class UnitsTab(_EditorTabBase):
         self.unit_table.setHorizontalHeaderLabels(["Original", "PM Unit"])
         self.unit_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.unit_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.unit_table.verticalHeader().setVisible(False)
+        vh = self.unit_table.verticalHeader()
+        if vh is not None:
+            vh.setVisible(False)
         self.unit_table.setColumnHidden(0, True)
-        self.unit_table.horizontalHeader().setStretchLastSection(True)
+        hh = self.unit_table.horizontalHeader()
+        if hh is not None:
+            hh.setStretchLastSection(True)
         self.unit_table.currentCellChanged.connect(self._on_unit_selected)
         self.unit_table.itemChanged.connect(self._on_unit_changed)
 
@@ -675,7 +699,7 @@ class UnitsTab(_EditorTabBase):
     def _on_unit_changed(self, item: QTableWidgetItem):
         if self._loading or item.column() != 1:
             return
-        item.setText((item.text() or "").strip())
+        item.setText((item.text() or "").strip())  # type: ignore[union-attr]
         self._set_dirty(True)
 
     def _get_row_items(self, row: int) -> Set[str]:
@@ -742,8 +766,8 @@ class UnitsTab(_EditorTabBase):
         selected: Set[str] = set()
         for i in range(self.item_checks.count()):
             item = self.item_checks.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
-                value = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
+            if item.checkState() == Qt.CheckState.Checked:  # type: ignore[union-attr]
+                value = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()  # type: ignore[union-attr]
                 if value:
                     selected.add(value)
         self._set_row_items(row, selected)
@@ -779,7 +803,8 @@ class UnitsTab(_EditorTabBase):
     def _validate(self) -> Optional[str]:
         seen: Set[str] = set()
         for row in range(self.unit_table.rowCount()):
-            unit = (self.unit_table.item(row, 1).text() if self.unit_table.item(row, 1) else "").strip()
+            ui = self.unit_table.item(row, 1)
+            unit = (ui.text() if ui else "").strip()  # type: ignore[union-attr]
             if not unit:
                 return f"Row {row + 1}: PM Unit name is required."
             if unit in seen:
@@ -910,8 +935,8 @@ class PerColorUnitsTab(_EditorTabBase):
         out: Set[str] = set()
         for i in range(self.unit_checks.count()):
             item = self.unit_checks.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
-                value = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()
+            if item.checkState() == Qt.CheckState.Checked:  # type: ignore[union-attr]
+                value = str(item.data(Qt.ItemDataRole.UserRole) or "").strip()  # type: ignore[union-attr]
                 if value:
                     out.add(value)
         return out
@@ -974,8 +999,12 @@ class QtyOverridesTab(_EditorTabBase):
         self.table.setHorizontalHeaderLabels(["Override", "PM Unit", "Quantity"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        vh2 = self.table.verticalHeader()
+        if vh2 is not None:
+            vh2.setVisible(False)
+        hh2 = self.table.horizontalHeader()
+        if hh2 is not None:
+            hh2.setStretchLastSection(True)
         self.table.setColumnWidth(0, 90)
         self.table.setColumnWidth(1, 420)
         self.table.setColumnWidth(2, 120)
@@ -988,7 +1017,7 @@ class QtyOverridesTab(_EditorTabBase):
         if self._loading:
             return
         if item.column() == 2:
-            txt = (item.text() or "").strip()
+            txt = (item.text() or "").strip()  # type: ignore[union-attr]
             if txt and not txt.isdigit():
                 item.setText("0")
         current = self._current_values()
@@ -1051,10 +1080,11 @@ class QtyOverridesTab(_EditorTabBase):
         values: Dict[str, int] = {}
         for row in range(self.table.rowCount()):
             override_item = self.table.item(row, 0)
-            if not override_item or override_item.checkState() != Qt.CheckState.Checked:
+            if not override_item or override_item.checkState() != Qt.CheckState.Checked:  # type: ignore[union-attr]
                 continue
-            unit = str(override_item.data(Qt.ItemDataRole.UserRole) or "").strip()
-            qty_text = (self.table.item(row, 2).text() if self.table.item(row, 2) else "").strip()
+            unit = str(override_item.data(Qt.ItemDataRole.UserRole) or "").strip()  # type: ignore[union-attr]
+            qi = self.table.item(row, 2)
+            qty_text = (qi.text() if qi else "").strip()  # type: ignore[union-attr]
             if not unit:
                 return None
             if not qty_text.isdigit():

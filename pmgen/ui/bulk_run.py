@@ -57,12 +57,13 @@ class BulkSortFilterProxyModel(QSortFilterProxyModel):
         return query in serial or query in model_name or query in customer or query in machine_status
 
     def lessThan(self, left: QModelIndex, right: QModelIndex):
-        left_data = self.sourceModel().data(left)
-        right_data = self.sourceModel().data(right)
+        left_data = self.sourceModel().data(left)  # type: ignore[union-attr]
+        right_data = self.sourceModel().data(right)  # type: ignore[union-attr]
 
         col = left.column()
-        status_col = self.sourceModel().status_col
-        result_col = self.sourceModel().result_col
+        sm = self.sourceModel()
+        status_col = sm.status_col if sm else -1  # type: ignore[union-attr,attr-defined]
+        result_col = sm.result_col if sm else -1  # type: ignore[union-attr,attr-defined]
 
         if col == status_col:
             def status_priority(val):

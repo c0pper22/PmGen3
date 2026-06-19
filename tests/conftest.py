@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 """Test harness isolation for Qt and Python writable runtime paths."""
 
 from __future__ import annotations
@@ -35,4 +36,4 @@ def _writable_location(location):
     return _original_writable_location(location)
 
 
-QStandardPaths.writableLocation = staticmethod(_writable_location)
+QStandardPaths.writableLocation = staticmethod(_writable_location)  # type: ignore[method-assign,assignment]
