@@ -15,7 +15,9 @@ def make_card(parent: QWidget | None = None, object_name: str = "Card") -> QWidg
 def configure_table_view(view: QTableView, compact: bool = False) -> None:
     view.setAlternatingRowColors(True)
     view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-    view.verticalHeader().setVisible(False)
+    vh = view.verticalHeader()
+    if vh is not None:
+        vh.setVisible(False)
+        vh.setDefaultSectionSize(32 if compact else 40)
     view.setShowGrid(False)
     view.setSortingEnabled(True)
-    view.verticalHeader().setDefaultSectionSize(32 if compact else 40)

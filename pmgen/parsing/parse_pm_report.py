@@ -1,5 +1,7 @@
 from pmgen.canon.canon_utils import canon_unit
 import csv
+import re
+from typing import Optional, List
 
 class PmItem:
     def __init__(self, descriptor = None, current_page_count = None, expected_page_count = None, current_drive_count = None, expected_drive_count = None):
@@ -89,9 +91,6 @@ class PmReport:
         items_stdout = "Items:\n\n  " + "\n  ".join(repr(item) for item in self.items) if self.items else "Items: (none)"
 
         return "\n".join([header_stdout, counters_stdout, items_stdout])
-    
-import re
-from typing import Optional, List
 
 def ParsePmReport(data: bytes) -> PmReport:
     # ---------------- helpers ----------------

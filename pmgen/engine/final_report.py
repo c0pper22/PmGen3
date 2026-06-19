@@ -20,9 +20,12 @@ except ImportError:
 
 def _pct_color(v) -> colors.Color:
     p = v
-    if p < 84.0: return colors.darkgray
-    elif p < 100.0: return colors.orange
-    else: return colors.red
+    if p < 84.0:
+        return colors.darkgray
+    elif p < 100.0:
+        return colors.orange
+    else:
+        return colors.red
 
 def _hline(thickness=1, color=colors.HexColor("#DDDDDD")):
     return HRFlowable(width="100%", thickness=thickness, color=color, spaceBefore=4, spaceAfter=6)
@@ -32,11 +35,13 @@ def _load_inventory_map():
     Loads inventory from cache and returns a dict: {(PartNumber, UnitName): Quantity}
     Note: The grouping key order here is (Part Number, Unit Name)
     """
-    if not HAS_DEPS: return {}
+    if not HAS_DEPS:
+        return {}
     try:
         base_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
         path = os.path.join(base_dir, "inventory_cache.csv")
-        if not os.path.exists(path): return {}
+        if not os.path.exists(path):
+            return {}
         
         df = pd.read_csv(path)
         if "Part Number" in df.columns:
@@ -207,8 +212,8 @@ def write_final_summary_pdf(
     styles.add(ParagraphStyle(name="TOCLink", parent=styles["BodyText"], fontName="Helvetica", fontSize=10, textColor=colors.blue, alignment=1)) # 1=Center
 
     # --- 1. PRE-CALCULATION ---
-    total_over_upn = {}
-    total_thr_upn = {}
+    total_over_upn: dict[tuple[str, str], int] = {}
+    total_thr_upn: dict[tuple[str, str], int] = {}
     individual_serials_story = [] 
     toc_data = []
 
@@ -291,9 +296,12 @@ def write_final_summary_pdf(
         if rows_over:
             rows_over.sort(key=lambda x: (x[2], x[1]))
             tbl_over = _make_parts_table(rows_over)
-            try: individual_serials_story.append(KeepTogether([tbl_over]))
-            except LayoutError: individual_serials_story.append(tbl_over)
-        else: individual_serials_story.append(Paragraph("(none)", styles["Muted"]))
+            try:
+                individual_serials_story.append(KeepTogether([tbl_over]))
+            except LayoutError:
+                individual_serials_story.append(tbl_over)
+        else:
+            individual_serials_story.append(Paragraph("(none)", styles["Muted"]))
         individual_serials_story.append(Spacer(1, 0.10 * inch))
 
         individual_serials_story.append(Paragraph(f"Final Parts — Threshold - {thr*100:.1f}%", styles["Section"]))
@@ -301,9 +309,12 @@ def write_final_summary_pdf(
         if rows_thr:
             rows_thr.sort(key=lambda x: (x[2], x[1]))
             tbl_thr = _make_parts_table(rows_thr)
-            try: individual_serials_story.append(KeepTogether([tbl_thr]))
-            except LayoutError: individual_serials_story.append(tbl_thr)
-        else: individual_serials_story.append(Paragraph("(none)", styles["Muted"]))
+            try:
+                individual_serials_story.append(KeepTogether([tbl_thr]))
+            except LayoutError:
+                individual_serials_story.append(tbl_thr)
+        else:
+            individual_serials_story.append(Paragraph("(none)", styles["Muted"]))
         
         individual_serials_story.append(Spacer(1, 0.2 * inch))
         individual_serials_story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#9CA3AF"), dash=(4, 4)))
@@ -322,7 +333,8 @@ def write_final_summary_pdf(
         f"Selected top <b>{len(top)}</b> of <b>{successful}</b> successful (from <b>{len(results)}</b> attempts).",
         f"Generated: {datetime.now().strftime('%Y-%m-%d')}",
     ]
-    for ml in meta_lines: story.append(Paragraph(ml, styles["Meta"]))
+    for ml in meta_lines:
+        story.append(Paragraph(ml, styles["Meta"]))
     story.append(Spacer(1, 0.15 * inch))
 
     story.append(Paragraph("Quick Links", styles["Section"]))
@@ -381,9 +393,12 @@ def write_final_summary_pdf(
                 have_qty = int(found_matches[0][1])
 
             order_qty = max(0, needed_qty - have_qty)
-            if have_qty == 0: code = 0 
-            elif have_qty < needed_qty: code = 1
-            else: code = 2
+            if have_qty == 0:
+                code = 0
+            elif have_qty < needed_qty:
+                code = 1
+            else:
+                code = 2
             
             u_name = unit[0]
             pn_key = unit[1]
@@ -416,7 +431,8 @@ def write_final_summary_pdf(
         for (unit, pn), qty in sorted(total_over_upn.items(), key=lambda k: (k[0][0], k[0][1])):
             rows.append([qty, pn, unit])
         story.append(_make_parts_table(rows))
-    else: story.append(Paragraph("(none)", styles["Muted"]))
+    else:
+        story.append(Paragraph("(none)", styles["Muted"]))
     story.append(Spacer(1, 0.2 * inch))
 
     story.append(Paragraph(f"All Serials — Consolidated Parts — Threshold - {thr*100:.1f}%", styles["Section"]))
@@ -426,7 +442,8 @@ def write_final_summary_pdf(
         for (unit, pn), qty in sorted(total_thr_upn.items(), key=lambda k: (k[0][0], k[0][1])):
             rows.append([qty, pn, unit])
         story.append(_make_parts_table(rows))
-    else: story.append(Paragraph("(none)", styles["Muted"]))
+    else:
+        story.append(Paragraph("(none)", styles["Muted"]))
     
     story.append(Spacer(1, 0.3 * inch))
     story.append(Paragraph("Individual Serial Breakdowns", styles["H1"]))

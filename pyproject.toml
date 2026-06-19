@@ -1,0 +1,26 @@
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = false
+warn_return_any = false
+warn_unused_configs = true
+
+# Libraries without type stubs
+[[tool.mypy.overrides]]
+module = [
+    "requests",
+    "reportlab.*",
+    "pandas",
+    "pyodbc",
+    "cryptography.*",
+]
+ignore_missing_imports = true
+
+# Tests can be less strict
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
+# check_ribon_update.py is a standalone utility
+[[tool.mypy.overrides]]
+module = "check_ribon_update"
+ignore_errors = true

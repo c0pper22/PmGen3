@@ -6,7 +6,6 @@ import traceback
 import platform
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtCore import QStandardPaths
 
 # Reuse the path convention from your http_client
 LOG_DIR = os.path.join(os.path.expanduser("~"), ".indybiz_pm")

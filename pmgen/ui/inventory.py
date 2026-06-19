@@ -2,12 +2,11 @@ import os
 import io
 import numpy as np
 import pandas as pd
-import logging
 from pmgen.system.wrappers import safe_slot
 from PyQt6.QtCore import Qt, QAbstractTableModel, QStandardPaths, QModelIndex
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-    QTableView, QFileDialog, QHeaderView, QApplication, QMessageBox
+    QTableView, QFileDialog, QHeaderView, QApplication
 )
 
 from .components import CustomMessageBox
@@ -418,8 +417,10 @@ class InventoryTab(QWidget):
         def clean_money(val):
             if isinstance(val, str):
                 val = val.replace('$', '').replace(',', '')
-                try: return float(val)
-                except: return 0.0
+                try:
+                    return float(val)
+                except Exception:
+                    return 0.0
             return val if isinstance(val, (int, float)) else 0.0
 
         clean_df['Unit Cost'] = clean_df['Unit Cost'].apply(clean_money)

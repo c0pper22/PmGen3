@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 
 from pmgen.rules.base import Context, RuleBase
 from pmgen.types import Finding, PmItem

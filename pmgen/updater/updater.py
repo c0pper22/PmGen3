@@ -423,8 +423,8 @@ class UpdateWorker(QObject):
                 return
 
             # Download and verify the manifest
-            manifest_bytes = self._download_manifest(manifest_asset)
-            sig_bytes = self._download_signature(sig_asset)
+            manifest_bytes = self._download_manifest(manifest_asset or {})
+            sig_bytes = self._download_signature(sig_asset or {})
 
             _verify_manifest_signature(manifest_bytes, sig_bytes)
             logger.info("Manifest signature verified successfully.")
@@ -454,7 +454,7 @@ class UpdateWorker(QObject):
             _validate_not_rollback(manifest.version)
 
             # Build the update context and store it for the download phase
-            zip_url = zip_asset["browser_download_url"]
+            zip_url = zip_asset["browser_download_url"] if zip_asset else ""
             context = UpdateDownloadContext(
                 manifest=manifest,
                 zip_url=zip_url,

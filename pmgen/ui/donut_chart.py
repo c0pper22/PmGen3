@@ -87,7 +87,7 @@ class DonutChart(QWidget):
 
     # ---- paint ----
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: QPaintEvent | None) -> None:
         _ = event
 
         painter = QPainter(self)

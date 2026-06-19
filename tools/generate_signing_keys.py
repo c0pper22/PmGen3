@@ -62,7 +62,7 @@ def save_key_files(
         )
     )
     public_path.write_bytes(
-        public_key.public_bytes(
+        public_key.public_bytes(  # type: ignore[attr-defined]
             encoding=Encoding.PEM,
             format=PublicFormat.SubjectPublicKeyInfo,
         )
@@ -98,8 +98,8 @@ def main() -> None:
     )
 
     # Base64 encode for env var / updater.py
-    private_b64 = base64.b64encode(private_key.private_bytes_raw()).decode()
-    public_b64 = base64.b64encode(public_key.public_bytes_raw()).decode()
+    private_b64 = base64.b64encode(private_key.private_bytes_raw()).decode()  # type: ignore[attr-defined]
+    public_b64 = base64.b64encode(public_key.public_bytes_raw()).decode()  # type: ignore[attr-defined]
 
     print()
     print("=" * 60)

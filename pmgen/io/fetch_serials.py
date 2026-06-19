@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 try:
     from bs4 import BeautifulSoup
 except ImportError:
-    BeautifulSoup = None
+    BeautifulSoup = None  # type: ignore[misc,assignment]  # type: ignore[assignment]
 
 BASE_URL = "https://eservice.toshiba-solutions.com"
 LOGIN_PAGE = f"{BASE_URL}/Account/LogOn"
@@ -90,7 +90,7 @@ def parse_serial_numbers(html: str) -> List[str]:
 
             # <div data-serial="CNAM66582">…</div>
             for el in soup.select("[data-serial]"):
-                val = (el.get("data-serial") or "").strip()
+                val = (el.get("data-serial") or "").strip()  # type: ignore[union-attr]
                 serial = _normalize_serial(val)
                 if serial:
                     found.append(serial)
@@ -99,7 +99,7 @@ def parse_serial_numbers(html: str) -> List[str]:
             for a in soup.find_all("a", href=True):
                 href = a["href"]
                 for key in ("serial", "deviceSerial"):
-                    m = re.search(rf"(?:\?|&){key}=([^&#]+)", href)
+                    m = re.search(rf"(?:\?|&){key}=([^&#]+)", str(href))
                     if m:
                         cand = m.group(1).strip()
                         cand = re.sub(r"%2f|%2F|%20", "", cand)

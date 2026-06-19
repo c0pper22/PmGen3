@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Callable
+
 from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
@@ -90,7 +92,7 @@ def _section_label(text: str, colors: dict) -> QLabel:
     return lbl
 
 
-def _section_header(text: str, colors: dict, on_copy: callable) -> QWidget:
+def _section_header(text: str, colors: dict, on_copy: Callable[[], None]) -> QWidget:
     """Section label + material copy icon button."""
     w = QWidget()
     w.setStyleSheet("background: transparent;")
@@ -132,7 +134,7 @@ def _copy_tsv(headers: list[str], rows: list[list[str]]) -> None:
     lines = [sep.join(headers)]
     for row in rows:
         lines.append(sep.join(row))
-    QApplication.clipboard().setText("\n".join(lines))
+    QApplication.clipboard().setText("\n".join(lines))  # type: ignore[union-attr]
 
 
 def _separator(colors: dict) -> QFrame:
@@ -188,7 +190,7 @@ class _WearBar(QWidget):
         self.setMinimumWidth(80)
 
     def paintEvent(self, event) -> None:
-        from PyQt6.QtGui import QPainter, QColor
+        from PyQt6.QtGui import QPainter
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -357,10 +359,10 @@ class WidgetReportView(QWidget):
             layout.setSpacing(12)
 
         # ── 1. Full-width info bar (no background card) ──
-        self._build_info_bar(layout, data, colors)
+        self._build_info_bar(layout, data, colors)  # type: ignore[arg-type]
 
         # ── 2. Full-width alerts ──
-        self._build_alerts(layout, data, colors)
+        self._build_alerts(layout, data, colors)  # type: ignore[arg-type]
 
         # ── 3. Counters + Error History + Summary side by side ──
 
@@ -396,7 +398,7 @@ class WidgetReportView(QWidget):
             headers = ["Code", "Counter", "Date", "Time"]
             rows: list[list[str]] = []
             for rec in data.error_records:
-                rows.append([rec.code, rec.counter, rec.date, rec.time])
+                rows.append([rec.code, rec.counter, rec.date, rec.time])  # type: ignore[attr-defined]  # type: ignore[attr-defined]
             _copy_tsv(headers, rows)
 
         labels_row.addWidget(_section_header("Error History", colors, _copy_error_history))
@@ -408,7 +410,7 @@ class WidgetReportView(QWidget):
         sl_layout.addWidget(_section_label("Summary", colors))
         sl_layout.addStretch()
         labels_row.addWidget(summary_label_wrap)
-        layout.addLayout(labels_row)
+        layout.addLayout(labels_row)  # type: ignore[attr-defined]
 
         # Content row
         content_row = QHBoxLayout()
@@ -426,15 +428,15 @@ class WidgetReportView(QWidget):
         sep3.setFixedWidth(1)
         content_row.addWidget(sep3, 0)
         content_row.addWidget(summary_wrap, 0)
-        layout.addLayout(content_row)
+        layout.addLayout(content_row)  # type: ignore[attr-defined]
 
         # ── 5. Wear Analysis table ──
-        self._build_wear_table(layout, data, colors)
+        self._build_wear_table(layout, data, colors)  # type: ignore[arg-type]
 
         # ── 6. Final Parts ──
-        self._build_final_parts(layout, data, colors)
+        self._build_final_parts(layout, data, colors)  # type: ignore[arg-type]
 
-        layout.addStretch()
+        layout.addStretch()  # type: ignore[attr-defined]
 
     # ── sections ─────────────────────────────────────────────────────────────
 
@@ -558,7 +560,7 @@ class WidgetReportView(QWidget):
             headers = ["Code", "Counter", "Date", "Time"]
             rows = []
             for rec in error_records:
-                rows.append([rec.code, rec.counter, rec.date, rec.time])
+                rows.append([rec.code, rec.counter, rec.date, rec.time])  # type: ignore[attr-defined]  # type: ignore[attr-defined]
             _copy_tsv(headers, rows)
 
         if not error_records:
@@ -595,13 +597,27 @@ class WidgetReportView(QWidget):
         table = QTableWidget()
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(["Code", "Counter", "Date", "Time"])
-        table.horizontalHeader().setStretchLastSection(True)
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setStretchLastSection(True)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
 
-        table.verticalHeader().setVisible(False)
+        vh = table.verticalHeader()
+
+        if vh is not None:
+
+            vh.setVisible(False)
         table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setAlternatingRowColors(False)
@@ -612,7 +628,9 @@ class WidgetReportView(QWidget):
 
         # Table is borderless — container provides the border + corner rounding.
         table.setFrameShape(QFrame.Shape.NoFrame)
-        table.horizontalHeader().setStyleSheet(
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setStyleSheet(
             f"QHeaderView::section {{"
             f"  background-color: {colors['surface_high'].name()};"
             f"  color: {colors['muted'].name()};"
@@ -626,7 +644,7 @@ class WidgetReportView(QWidget):
         table.setRowCount(len(error_records))
         for i, rec in enumerate(error_records):
             # Code
-            code_item = QTableWidgetItem(rec.code)
+            code_item = QTableWidgetItem(rec.code)  # type: ignore[attr-defined]
             code_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             code_item.setForeground(colors['danger'])
             code_font = QFont()
@@ -635,19 +653,19 @@ class WidgetReportView(QWidget):
             table.setItem(i, 0, code_item)
 
             # Counter
-            counter_item = QTableWidgetItem(rec.counter)
+            counter_item = QTableWidgetItem(rec.counter)  # type: ignore[attr-defined]
             counter_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             counter_item.setForeground(colors['text'])
             table.setItem(i, 1, counter_item)
 
             # Date
-            date_item = QTableWidgetItem(rec.date)
+            date_item = QTableWidgetItem(rec.date)  # type: ignore[attr-defined]
             date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             date_item.setForeground(colors['text'])
             table.setItem(i, 2, date_item)
 
             # Time
-            time_item = QTableWidgetItem(rec.time)
+            time_item = QTableWidgetItem(rec.time)  # type: ignore[attr-defined]
             time_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             time_item.setForeground(colors['muted'])
             table.setItem(i, 3, time_item)
@@ -675,18 +693,34 @@ class WidgetReportView(QWidget):
         table = QTableWidget()
         table.setColumnCount(5)
         table.setHorizontalHeaderLabels(["Item", "Unit", "Wear %", "", "Status"])
-        table.horizontalHeader().setStretchLastSection(False)
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setStretchLastSection(False)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        hh = table.horizontalHeader()
+        if hh is not None:
+            hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         table.setColumnWidth(1, 200)
         table.setColumnWidth(2, 70)
         table.setColumnWidth(3, 500)
         table.setColumnWidth(4, 65)
 
-        table.verticalHeader().setVisible(False)
+        vh = table.verticalHeader()
+
+        if vh is not None:
+
+            vh.setVisible(False)
         table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setAlternatingRowColors(False)
@@ -783,12 +817,20 @@ class WidgetReportView(QWidget):
             table = QTableWidget()
             table.setColumnCount(3)
             table.setHorizontalHeaderLabels(["Qty", "Part Number", "Unit"])
-            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-            table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+            hh = table.horizontalHeader()
+            if hh is not None:
+                hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            hh = table.horizontalHeader()
+            if hh is not None:
+                hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            hh = table.horizontalHeader()
+            if hh is not None:
+                hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
             table.setColumnWidth(0, 35)
             table.setColumnWidth(2, 400)
-            table.verticalHeader().setVisible(False)
+            vh = table.verticalHeader()
+            if vh is not None:
+                vh.setVisible(False)
             table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
             table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             table.setShowGrid(False)

@@ -4,7 +4,7 @@ import traceback
 from fnmatch import fnmatchcase
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_08_bytes, _parse_code_from_csv_bytes, get_unpacking_date
+from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_csv_bytes, get_unpacking_date
 from pmgen.engine.single_report import generate_from_bytes, build_report_data
 from datetime import datetime, date
 import calendar
@@ -94,7 +94,7 @@ class BulkConfig:
     top_n: int = 25
     out_dir: str = ""
     pool_size: int = 4
-    blacklist: list[str] = None
+    blacklist: list[str] | None = None
     show_all: bool = False
     custom_08_name: str = ""
     custom_08_code: int = 0
@@ -110,7 +110,8 @@ class BulkConfig:
     unpack_min_months: int = 0
 
     def __post_init__(self):
-        if self.blacklist is None: self.blacklist = []
+        if self.blacklist is None:
+            self.blacklist = []
         self.machine_filter = (self.machine_filter or "both").strip().lower()
         if self.machine_filter not in {"active", "inactive", "both"}:
             self.machine_filter = "both"
@@ -144,9 +145,9 @@ class BulkRunner(QObject):
             if str(serial).strip()
         }
 
-        self._blacklist = [p.upper() for p in (cfg.blacklist or [])]
+        self._blacklist: list[str] = [p.upper() for p in (cfg.blacklist or [])]
 
-        self._unpack_max_enabled = bool(unpack_max_enabled)
+        self._unpack_max_enabled: bool = bool(unpack_max_enabled)
         self._unpack_max_months = max(0, min(120, int(unpack_max_months)))
         self._unpack_min_enabled = bool(unpack_min_enabled)
         self._unpack_min_months = max(0, min(120, int(unpack_min_months)))
@@ -157,13 +158,17 @@ class BulkRunner(QObject):
     def _is_blacklisted(self, serial: str) -> bool:
         s = (serial or "").upper()
         for pat in (self._blacklist or []):
-            if fnmatchcase(s, pat): return True
+            if fnmatchcase(s, pat):
+                return True
         return False
 
     def _fmt_pct(self, p):
-        if p is None: return "—"
-        try: return f"{(float(p) * 100):.1f}%"
-        except Exception: return "—"
+        if p is None:
+            return "—"
+        try:
+            return f"{(float(p) * 100):.1f}%"
+        except Exception:
+            return "—"
 
     def _machine_filter_label(self) -> str:
         labels = {"active": "Active", "inactive": "Inactive", "both": "Active/Inactive"}
@@ -226,7 +231,7 @@ class BulkRunner(QObject):
                     counter += 1
                 os.makedirs(final_out_dir, exist_ok=True)
 
-            from pmgen.io.http_client import SessionPool, get_serial_status_map_after_login, get_service_file_bytes, get_unpacking_date
+            from pmgen.io.http_client import SessionPool, get_serial_status_map_after_login, get_service_file_bytes
             from pmgen.parsing.parse_pm_report import parse_pm_report
             from pmgen.engine.run_rules import run_rules
             from pmgen.engine.single_report import create_pdf_report
@@ -270,8 +275,10 @@ class BulkRunner(QObject):
 
             def get_val(item, key, default=0.0):
                 val = getattr(item, key, None)
-                if val is not None: return val
-                if isinstance(item, dict): return item.get(key, default)
+                if val is not None:
+                    return val
+                if isinstance(item, dict):
+                    return item.get(key, default)
                 return default
 
             # --- WORKER FUNCTION ---
@@ -326,7 +333,7 @@ class BulkRunner(QObject):
                     d_str = unpack_date.strftime("%Y-%m-%d") if unpack_date else ""
 
                     # C. Check Date Filter
-                    filter_reason = self._check_date_filter(unpack_date)
+                    filter_reason = self._check_date_filter(unpack_date)  # type: ignore[arg-type]
 
                     if filter_reason:
                         # FILTERED: Update UI with percentage, but mark as filtered.
@@ -434,5 +441,7 @@ class BulkRunner(QObject):
             logger.exception(f"BulkRunner failed: {e}")
         finally:
             if pool:
-                try: pool.close()
-                except: pass
+                try:
+                    pool.close()
+                except Exception:
+                    pass

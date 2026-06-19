@@ -78,11 +78,16 @@ class BulkQueueModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.ForegroundRole and col == self.status_col:
             status_idx = self.visual_to_internal[self.status_col]
             status = self._data[row][status_idx]
-            if status == "Done": return QBrush(QColor(COLOR_SUCCESS))
-            if status == "Failed": return QBrush(QColor(COLOR_ERROR))
-            if status == "Processing": return QBrush(QColor(COLOR_PRIMARY_CONTAINER))
-            if status == "Queued": return QBrush(QColor(COLOR_ON_SURFACE_VARIANT))
-            if status == "Filtered": return QBrush(QColor(COLOR_DANGER))
+            if status == "Done":
+                return QBrush(QColor(COLOR_SUCCESS))
+            if status == "Failed":
+                return QBrush(QColor(COLOR_ERROR))
+            if status == "Processing":
+                return QBrush(QColor(COLOR_PRIMARY_CONTAINER))
+            if status == "Queued":
+                return QBrush(QColor(COLOR_ON_SURFACE_VARIANT))
+            if status == "Filtered":
+                return QBrush(QColor(COLOR_DANGER))
 
         return None
 
@@ -103,10 +108,14 @@ class BulkQueueModel(QAbstractTableModel):
         reverse = (order == Qt.SortOrder.DescendingOrder)
 
         def status_priority(val):
-            if val == "Done": return 0
-            if val == "Failed": return 1
-            if val == "Filtered": return 2
-            if val == "Queued": return 3
+            if val == "Done":
+                return 0
+            if val == "Failed":
+                return 1
+            if val == "Filtered":
+                return 2
+            if val == "Queued":
+                return 3
             return 4
 
         def percentage_value(val_str):
@@ -135,8 +144,10 @@ class BulkQueueModel(QAbstractTableModel):
     def add_item(self, serial, model="Unknown", customer="", machine_status=""):
         self.beginInsertRows(QModelIndex(), len(self._data), len(self._data))
         row = [serial, model, customer, machine_status, ""]
-        if self.has_custom_08: row.append("")
-        if self.has_custom_05: row.append("")
+        if self.has_custom_08:
+            row.append("")
+        if self.has_custom_05:
+            row.append("")
         row.append("Queued")
         row.append("")
         self._data.append(row)
@@ -149,10 +160,14 @@ class BulkQueueModel(QAbstractTableModel):
                 row[self._status_idx] = status
                 row[self._result_idx] = result
 
-                if model and model != "Unknown": row[1] = model
-                if customer: row[2] = customer
-                if machine_status: row[3] = machine_status
-                if unpack_date: row[4] = unpack_date
+                if model and model != "Unknown":
+                    row[1] = model
+                if customer:
+                    row[2] = customer
+                if machine_status:
+                    row[3] = machine_status
+                if unpack_date:
+                    row[4] = unpack_date
                 if custom08_val is not None and self._c08_idx is not None:
                     row[self._c08_idx] = custom08_val
                 if custom05_val is not None and self._c05_idx is not None:

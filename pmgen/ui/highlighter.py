@@ -1,6 +1,5 @@
 import re
 from PyQt6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
-from PyQt6.QtCore import Qt
 from pmgen.ui.theme import OUTPUT_HIGHLIGHT_COLORS
 
 class OutputHighlighter(QSyntaxHighlighter):
@@ -94,8 +93,10 @@ class OutputHighlighter(QSyntaxHighlighter):
         self.fmt_kv_label = self._mkfmt(colors["kv_label"], bold=True)
         self.fmt_kv_value = self._mkfmt(colors["kv_value"], bold=True)
 
-    def highlightBlock(self, text: str):
+    def highlightBlock(self, text: str | None):
         """Main entry point for syntax highlighting."""
+        if text is None:
+            return
         # 1. Apply base normal format to the whole line
         self.setFormat(0, len(text), self.fmt_normal)
 

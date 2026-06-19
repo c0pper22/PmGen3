@@ -53,7 +53,7 @@ def _sample_config(**overrides) -> BulkConfig:
         unpack_min_months=6,
     )
     kwargs.update(overrides)
-    return BulkConfig(**kwargs)
+    return BulkConfig(**kwargs)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

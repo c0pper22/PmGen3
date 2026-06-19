@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
-from pmgen.types import PmReport, PmItem, Finding, Selection
+from typing import Dict, List, Any
+from pmgen.types import PmReport, PmItem, Finding
 
 @dataclass
 class Context:

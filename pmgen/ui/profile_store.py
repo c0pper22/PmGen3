@@ -134,7 +134,7 @@ def load_profile(name: str) -> BulkConfig:
             kwargs[field_name] = s.value(full_key, "", str) or ""
         else:
             kwargs[field_name] = int(s.value(full_key, 0, int))
-    return BulkConfig(**kwargs)
+    return BulkConfig(**kwargs)  # type: ignore[arg-type]
 
 
 def save_profile(name: str, cfg: BulkConfig) -> None:
