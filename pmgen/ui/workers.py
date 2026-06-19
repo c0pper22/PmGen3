@@ -110,7 +110,8 @@ class BulkConfig:
     unpack_min_months: int = 0
 
     def __post_init__(self):
-        if self.blacklist is None: self.blacklist = []
+        if self.blacklist is None:
+            self.blacklist = []
         self.machine_filter = (self.machine_filter or "both").strip().lower()
         if self.machine_filter not in {"active", "inactive", "both"}:
             self.machine_filter = "both"
@@ -157,13 +158,17 @@ class BulkRunner(QObject):
     def _is_blacklisted(self, serial: str) -> bool:
         s = (serial or "").upper()
         for pat in (self._blacklist or []):
-            if fnmatchcase(s, pat): return True
+            if fnmatchcase(s, pat):
+                return True
         return False
 
     def _fmt_pct(self, p):
-        if p is None: return "—"
-        try: return f"{(float(p) * 100):.1f}%"
-        except Exception: return "—"
+        if p is None:
+            return "—"
+        try:
+            return f"{(float(p) * 100):.1f}%"
+        except Exception:
+            return "—"
 
     def _machine_filter_label(self) -> str:
         labels = {"active": "Active", "inactive": "Inactive", "both": "Active/Inactive"}
@@ -270,8 +275,10 @@ class BulkRunner(QObject):
 
             def get_val(item, key, default=0.0):
                 val = getattr(item, key, None)
-                if val is not None: return val
-                if isinstance(item, dict): return item.get(key, default)
+                if val is not None:
+                    return val
+                if isinstance(item, dict):
+                    return item.get(key, default)
                 return default
 
             # --- WORKER FUNCTION ---
@@ -434,5 +441,7 @@ class BulkRunner(QObject):
             logger.exception(f"BulkRunner failed: {e}")
         finally:
             if pool:
-                try: pool.close()
-                except: pass
+                try:
+                    pool.close()
+                except Exception:
+                    pass

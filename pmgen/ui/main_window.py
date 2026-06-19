@@ -51,6 +51,7 @@ from .factory import UIFactory
 from .catalog_editor import CatalogEditorWindow
 from .pages import DashboardTabs, InventoryPage, SingleReportPage
 from .shell import WindowResizeMixin, resolve_icon_dir
+from .bulk_run import BulkRunTab
 
 
 SERVICE_NAME = "PmGen"
@@ -62,10 +63,6 @@ BULK_DIR_KEY  = "bulk/out_dir"
 BULK_POOL_KEY = "bulk/pool_size"
 BULK_BLACKLIST_KEY = "bulk/blacklist"
 BULK_MACHINE_FILTER_KEY = "bulk/machine_filter"
-
-
-# Compatibility exports for callers that import these classes from this module.
-from .bulk_run import BulkRunTab
 
 
 # =============================================================================
@@ -239,7 +236,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                     "This bulk job is still running.\nAre you sure you want to stop and close it?", 
                     self._icon_dir
                 )
-                if res != "ok": return
+                if res != "ok":
+                    return
                 widget.stop()
                 # Defer removal until the thread actually finishes
                 widget.finished.connect(lambda w=widget: self._cleanup_bulk_tab(w))
@@ -273,8 +271,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         return bool(QSettings().value(self.BULK_UNPACK_KEY_ENABLE, False, bool))
 
     def _get_unpack_extra_months(self) -> int:
-        try: v = int(QSettings().value(self.BULK_UNPACK_KEY_EXTRA, 0, int))
-        except: v = 0
+        try:
+            v = int(QSettings().value(self.BULK_UNPACK_KEY_EXTRA, 0, int))
+        except Exception:
+            v = 0
         return max(0, min(120, v))
 
     def _get_bulk_config(self) -> BulkConfig:
@@ -286,17 +286,25 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         pool  = int(s.value(BULK_POOL_KEY, 4, int))
         bl_raw = s.value(BULK_BLACKLIST_KEY, "", str) or ""
         bl = [line.strip().upper() for line in re.split(r"[,\n]+", bl_raw) if line.strip()]
-        
+
         c_name = s.value("bulk/custom_08_name", "", str)
-        try: c_code = int(s.value("bulk/custom_08_code", 0, int))
-        except: c_code = 0
-        try: c_sub = int(s.value("bulk/custom_08_sub", 0, int))
-        except: c_sub = 0
+        try:
+            c_code = int(s.value("bulk/custom_08_code", 0, int))
+        except Exception:
+            c_code = 0
+        try:
+            c_sub = int(s.value("bulk/custom_08_sub", 0, int))
+        except Exception:
+            c_sub = 0
         c05_name = s.value("bulk/custom_05_name", "", str)
-        try: c05_code = int(s.value("bulk/custom_05_code", 0, int))
-        except: c05_code = 0
-        try: c05_sub = int(s.value("bulk/custom_05_sub", 0, int))
-        except: c05_sub = 0
+        try:
+            c05_code = int(s.value("bulk/custom_05_code", 0, int))
+        except Exception:
+            c05_code = 0
+        try:
+            c05_sub = int(s.value("bulk/custom_05_sub", 0, int))
+        except Exception:
+            c05_sub = 0
         
         gen_pdfs = bool(s.value("bulk/generate_pdfs", True, bool))
         machine_filter = s.value(BULK_MACHINE_FILTER_KEY, "both", str)
@@ -359,8 +367,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         QSettings().setValue(self.COLORIZED_KEY, bool(on))
 
     def _get_threshold(self) -> float:
-        try: v = float(QSettings().value(self.THRESH_KEY, 0.80, float))
-        except: v = 0.80
+        try:
+            v = float(QSettings().value(self.THRESH_KEY, 0.80, float))
+        except Exception:
+            v = 0.80
         return max(0.0, min(1.0, v))
 
     def _set_threshold(self, v: float):
@@ -415,7 +425,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
     def _set_history(self, items: list[str]):
         self._id_combo.clear()
-        for it in items: self._id_combo.addItem(it)
+        for it in items:
+            self._id_combo.addItem(it)
 
     def _upsert_id_history(self, serial: str) -> str:
         """Adds a serial to history, keeping newest-first order and a fixed max size."""
@@ -735,12 +746,15 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         le.blockSignals(False)
 
     def _apply_colorized_highlighter(self):
-        if not hasattr(self, "_out_highlighter"): self._out_highlighter = None
+        if not hasattr(self, "_out_highlighter"):
+            self._out_highlighter = None
         want, have = self._get_colorized(), self._out_highlighter is not None
         if want and not have:
             self._out_highlighter = OutputHighlighter(self.editor.document())
         elif not want and have:
-            self._out_highlighter.setDocument(None); self._out_highlighter.deleteLater(); self._out_highlighter = None
+            self._out_highlighter.setDocument(None)
+            self._out_highlighter.deleteLater()
+            self._out_highlighter = None
             self.editor.setPlainText(self.editor.toPlainText())
     
     @safe_slot
@@ -914,17 +928,24 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         top = QLabel("Items over 100% life are always DUE.\nOptionally enable a lower due threshold.", dlg)
         top.setObjectName("DialogLabel")
         
-        enable_cb = QCheckBox("Enable Optional threshold", dlg); enable_cb.setObjectName("DialogCheckbox")
+        enable_cb = QCheckBox("Enable Optional threshold", dlg)
+        enable_cb.setObjectName("DialogCheckbox")
         enable_cb.setChecked(self._get_threshold_enabled())
 
         slider = QSlider(Qt.Orientation.Horizontal, dlg)
         slider.setObjectName("ThresholdSlider")
-        slider.setRange(0, 100); slider.setTickInterval(10); slider.setValue(int(self._get_threshold()*100))
+        slider.setRange(0, 100)
+        slider.setTickInterval(10)
+        slider.setValue(int(self._get_threshold() * 100))
 
-        pct_box = QDoubleSpinBox(dlg); pct_box.setObjectName("DialogInput")
-        pct_box.setRange(0.0, 100.0); pct_box.setSuffix("%"); pct_box.setValue(self._get_threshold()*100.0)
-        
-        slider.setEnabled(enable_cb.isChecked()); pct_box.setEnabled(enable_cb.isChecked())
+        pct_box = QDoubleSpinBox(dlg)
+        pct_box.setObjectName("DialogInput")
+        pct_box.setRange(0.0, 100.0)
+        pct_box.setSuffix("%")
+        pct_box.setValue(self._get_threshold() * 100.0)
+
+        slider.setEnabled(enable_cb.isChecked())
+        pct_box.setEnabled(enable_cb.isChecked())
         
         enable_cb.toggled.connect(lambda c: (self._set_threshold_enabled(c), slider.setEnabled(c), pct_box.setEnabled(c)))
         slider.valueChanged.connect(lambda v: pct_box.setValue(float(v)))
@@ -933,30 +954,49 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         save_btn = QPushButton("Save", dlg)
         save_btn.clicked.connect(lambda: (self._set_threshold(pct_box.value()/100.0), self._update_threshold_button(), dlg.accept()))
 
-        dlg._content_layout.addWidget(top); dlg._content_layout.addWidget(enable_cb)
-        r1 = QHBoxLayout(); r1.addWidget(slider, 1); r1.addWidget(pct_box); dlg._content_layout.addLayout(r1)
-        r2 = QHBoxLayout(); r2.addStretch(1); r2.addWidget(save_btn); dlg._content_layout.addLayout(r2)
+        dlg._content_layout.addWidget(top)
+        dlg._content_layout.addWidget(enable_cb)
+        r1 = QHBoxLayout()
+        r1.addWidget(slider, 1)
+        r1.addWidget(pct_box)
+        dlg._content_layout.addLayout(r1)
+        r2 = QHBoxLayout()
+        r2.addStretch(1)
+        r2.addWidget(save_btn)
+        dlg._content_layout.addLayout(r2)
         dlg.exec()
     
     @safe_slot
     def _open_login_dialog(self, *args):
         dlg = FramelessDialog(self, "Login", self._icon_dir)
-        u_in = QLineEdit(dlg); u_in.setObjectName("DialogInput"); u_in.setPlaceholderText("Username")
-        if (last_user := QSettings().value(self.AUTH_USERNAME_KEY, "", str)): u_in.setText(last_user)
-        p_in = QLineEdit(dlg); p_in.setEchoMode(QLineEdit.EchoMode.Password); p_in.setObjectName("DialogInput"); p_in.setPlaceholderText("Password")
-        
-        remember = QCheckBox("Stay Logged In", dlg); remember.setObjectName("DialogCheckbox")
+        u_in = QLineEdit(dlg)
+        u_in.setObjectName("DialogInput")
+        u_in.setPlaceholderText("Username")
+        last_user = QSettings().value(self.AUTH_USERNAME_KEY, "", str)
+        if last_user:
+            u_in.setText(last_user)
+        p_in = QLineEdit(dlg)
+        p_in.setEchoMode(QLineEdit.EchoMode.Password)
+        p_in.setObjectName("DialogInput")
+        p_in.setPlaceholderText("Password")
+
+        remember = QCheckBox("Stay Logged In", dlg)
+        remember.setObjectName("DialogCheckbox")
         remember.setChecked(bool(QSettings().value(self.AUTH_REMEMBER_KEY, False, bool)))
         
-        btn_login = QPushButton("Login", dlg); btn_login.setDefault(True)
+        btn_login = QPushButton("Login", dlg)
+        btn_login.setDefault(True)
 
         def _do_login():
             u, p = u_in.text().strip(), p_in.text()
-            if not u or not p: return
+            if not u or not p:
+                return
 
             logging.info(f"Attempting manual login for user: {u}")
 
-            btn_login.setEnabled(False); self.user_label.setText("Signing in…"); self.editor.appendPlainText(f"[Auto-Login] Attempting as {u}…")
+            btn_login.setEnabled(False)
+            self.user_label.setText("Signing in…")
+            self.editor.appendPlainText(f"[Auto-Login] Attempting as {u}…")
             try:
                 from pmgen.io import http_client as hc
                 hc.save_credentials(u, p)
@@ -965,32 +1005,50 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                 QSettings().setValue(self.AUTH_REMEMBER_KEY, remember.isChecked())
                 QSettings().setValue(self.AUTH_USERNAME_KEY, u)
                 self._session = sess
-                self._signed_in = True; self._current_user = u; self._update_auth_ui()
+                self._signed_in = True
+                self._current_user = u
+                self._update_auth_ui()
                 self.editor.appendPlainText(f"[Auto-Login] {u} — success")
                 self.customerMap = get_customer_map_after_login(sess)
                 dlg.accept()
             except Exception as e:
-                self._signed_in = False; self._current_user = ""; self._update_auth_ui()
+                self._signed_in = False
+                self._current_user = ""
+                self._update_auth_ui()
                 self.editor.appendPlainText(f"[Auto-Login] {u} — failed: {e}")
                 CustomMessageBox.warn(self, "Login failed", str(e), self._icon_dir)
-            finally: btn_login.setEnabled(True)
+            finally:
+                btn_login.setEnabled(True)
 
         btn_login.clicked.connect(_do_login)
-        dlg._content_layout.addWidget(QLabel("Username", dlg)); dlg._content_layout.addWidget(u_in)
-        dlg._content_layout.addWidget(QLabel("Password", dlg)); dlg._content_layout.addWidget(p_in)
-        row = QHBoxLayout(); row.addWidget(remember); row.addStretch(1); row.addWidget(btn_login)
-        dlg._content_layout.addLayout(row); dlg.exec()
+        dlg._content_layout.addWidget(QLabel("Username", dlg))
+        dlg._content_layout.addWidget(u_in)
+        dlg._content_layout.addWidget(QLabel("Password", dlg))
+        dlg._content_layout.addWidget(p_in)
+        row = QHBoxLayout()
+        row.addWidget(remember)
+        row.addStretch(1)
+        row.addWidget(btn_login)
+        dlg._content_layout.addLayout(row)
+        dlg.exec()
 
     @safe_slot
     def _open_life_basis_dialog(self, *args):
         dlg = FramelessDialog(self, "Life Basis", self._icon_dir)
-        lbl = QLabel("Choose counter basis (fallback to other if missing).", dlg); lbl.setObjectName("DialogLabel")
-        box = QComboBox(dlg); box.setObjectName("DialogInput"); box.addItems(["Page", "Drive"])
+        lbl = QLabel("Choose counter basis (fallback to other if missing).", dlg)
+        lbl.setObjectName("DialogLabel")
+        box = QComboBox(dlg)
+        box.setObjectName("DialogInput")
+        box.addItems(["Page", "Drive"])
         box.setCurrentIndex(0 if self._get_life_basis() == "page" else 1)
         btn = QPushButton("Save", dlg)
         btn.clicked.connect(lambda: (self._set_life_basis("page" if box.currentIndex()==0 else "drive"), self._update_basis_button(), dlg.accept()))
-        dlg._content_layout.addWidget(lbl); dlg._content_layout.addWidget(box)
-        r = QHBoxLayout(); r.addStretch(1); r.addWidget(btn); dlg._content_layout.addLayout(r)
+        dlg._content_layout.addWidget(lbl)
+        dlg._content_layout.addWidget(box)
+        r = QHBoxLayout()
+        r.addStretch(1)
+        r.addWidget(btn)
+        dlg._content_layout.addLayout(r)
         dlg.exec()
 
     @safe_slot
@@ -1128,8 +1186,12 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             grid.addWidget(widget, row, 1, Qt.AlignmentFlag.AlignRight)
         
         # --- Standard Config ---
-        sp_pool = _set_field_width(QSpinBox(dlg), 180); sp_pool.setObjectName("DialogInput"); sp_pool.setRange(1, 16); sp_pool.setValue(cfg.pool_size)
-        machine_box = QComboBox(dlg); machine_box.setObjectName("DialogInput")
+        sp_pool = _set_field_width(QSpinBox(dlg), 180)
+        sp_pool.setObjectName("DialogInput")
+        sp_pool.setRange(1, 16)
+        sp_pool.setValue(cfg.pool_size)
+        machine_box = QComboBox(dlg)
+        machine_box.setObjectName("DialogInput")
         for label, value in (("Both", "both"), ("Active", "active"), ("Inactive", "inactive")):
             machine_box.addItem(label, value)
         machine_box.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
@@ -1145,9 +1207,12 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         cb_gen_pdfs.setObjectName("DialogCheckbox")
         cb_gen_pdfs.setMinimumHeight(30)
         cb_gen_pdfs.setChecked(cfg.generate_pdfs)
-        ed_dir = QLineEdit(cfg.out_dir, dlg); ed_dir.setObjectName("DialogInput")
+        ed_dir = QLineEdit(cfg.out_dir, dlg)
+        ed_dir.setObjectName("DialogInput")
         ed_dir.setMinimumHeight(34)
-        btn_br = QPushButton("Browse", dlg); btn_br.setFixedSize(112, 34); btn_br.clicked.connect(lambda: ed_dir.setText(QFileDialog.getExistingDirectory(self, "Out", cfg.out_dir) or cfg.out_dir))
+        btn_br = QPushButton("Browse", dlg)
+        btn_br.setFixedSize(112, 34)
+        btn_br.clicked.connect(lambda: ed_dir.setText(QFileDialog.getExistingDirectory(self, "Out", cfg.out_dir) or cfg.out_dir))
         
         def toggle_out_dir(checked):
             ed_dir.setEnabled(checked)
@@ -1155,8 +1220,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         cb_gen_pdfs.toggled.connect(toggle_out_dir)
         toggle_out_dir(cfg.generate_pdfs)
 
-        sp_top = _set_field_width(QSpinBox(dlg), 96); sp_top.setObjectName("DialogInput")
-        sp_top.setRange(1, 9999); sp_top.setValue(cfg.top_n)
+        sp_top = _set_field_width(QSpinBox(dlg), 96)
+        sp_top.setObjectName("DialogInput")
+        sp_top.setRange(1, 9999)
+        sp_top.setValue(cfg.top_n)
         cb_gen_pdfs.toggled.connect(sp_top.setEnabled)
         sp_top.setEnabled(cfg.generate_pdfs)
 
@@ -1221,15 +1288,23 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         # --- Date Filters (Max Age / Min Age) ---
         
         # 1. Max Age (Existing: "Unpack Filter")
-        cb_max_age = QCheckBox("Exclude older than", dlg); cb_max_age.setObjectName("DialogCheckbox"); cb_max_age.setMinimumHeight(30)
+        cb_max_age = QCheckBox("Exclude older than", dlg)
+        cb_max_age.setObjectName("DialogCheckbox")
+        cb_max_age.setMinimumHeight(30)
         cb_max_age.setChecked(bool(s.value("bulk/unpack_filter_enabled", False, bool)))
-        sp_max_age = _set_field_width(QSpinBox(dlg), 96); sp_max_age.setObjectName("DialogInput"); sp_max_age.setRange(0, 120)
-        sp_max_age.setValue(int(s.value("bulk/unpack_extra_months", 0, int))) # Reusing existing key
-        
+        sp_max_age = _set_field_width(QSpinBox(dlg), 96)
+        sp_max_age.setObjectName("DialogInput")
+        sp_max_age.setRange(0, 120)
+        sp_max_age.setValue(int(s.value("bulk/unpack_extra_months", 0, int)))  # Reusing existing key
+
         # 2. Min Age (New)
-        cb_min_age = QCheckBox("Exclude newer than", dlg); cb_min_age.setObjectName("DialogCheckbox"); cb_min_age.setMinimumHeight(30)
+        cb_min_age = QCheckBox("Exclude newer than", dlg)
+        cb_min_age.setObjectName("DialogCheckbox")
+        cb_min_age.setMinimumHeight(30)
         cb_min_age.setChecked(bool(s.value("bulk/unpack_min_filter_enabled", False, bool)))
-        sp_min_age = _set_field_width(QSpinBox(dlg), 96); sp_min_age.setObjectName("DialogInput"); sp_min_age.setRange(0, 120)
+        sp_min_age = _set_field_width(QSpinBox(dlg), 96)
+        sp_min_age.setObjectName("DialogInput")
+        sp_min_age.setRange(0, 120)
         sp_min_age.setValue(int(s.value("bulk/unpack_min_months", 0, int)))
 
         cb_max_age.toggled.connect(sp_max_age.setEnabled)
@@ -1242,22 +1317,32 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         btn_save.setFixedSize(120, 40)
 
         # --- Custom 08 Filters ---
-        cb_cust_name = QLineEdit(cfg.custom_08_name, dlg); cb_cust_name.setObjectName("DialogInput")
+        cb_cust_name = QLineEdit(cfg.custom_08_name, dlg)
+        cb_cust_name.setObjectName("DialogInput")
         cb_cust_name.setMinimumHeight(34)
         cb_cust_name.setPlaceholderText("Leave Empty to disable")
-        sp_cust_code = _set_field_width(QSpinBox(dlg), 120); sp_cust_code.setObjectName("DialogInput")
-        sp_cust_code.setRange(0, 999999); sp_cust_code.setValue(cfg.custom_08_code)
-        sp_cust_sub = _set_field_width(QSpinBox(dlg), 120); sp_cust_sub.setObjectName("DialogInput")
-        sp_cust_sub.setRange(0, 999999); sp_cust_sub.setValue(cfg.custom_08_sub)
+        sp_cust_code = _set_field_width(QSpinBox(dlg), 120)
+        sp_cust_code.setObjectName("DialogInput")
+        sp_cust_code.setRange(0, 999999)
+        sp_cust_code.setValue(cfg.custom_08_code)
+        sp_cust_sub = _set_field_width(QSpinBox(dlg), 120)
+        sp_cust_sub.setObjectName("DialogInput")
+        sp_cust_sub.setRange(0, 999999)
+        sp_cust_sub.setValue(cfg.custom_08_sub)
 
         # --- Custom 05 Filters ---
-        cb_cust05_name = QLineEdit(cfg.custom_05_name, dlg); cb_cust05_name.setObjectName("DialogInput")
+        cb_cust05_name = QLineEdit(cfg.custom_05_name, dlg)
+        cb_cust05_name.setObjectName("DialogInput")
         cb_cust05_name.setMinimumHeight(34)
         cb_cust05_name.setPlaceholderText("Leave Empty to disable")
-        sp_cust05_code = _set_field_width(QSpinBox(dlg), 120); sp_cust05_code.setObjectName("DialogInput")
-        sp_cust05_code.setRange(0, 999999); sp_cust05_code.setValue(cfg.custom_05_code)
-        sp_cust05_sub = _set_field_width(QSpinBox(dlg), 120); sp_cust05_sub.setObjectName("DialogInput")
-        sp_cust05_sub.setRange(0, 999999); sp_cust05_sub.setValue(cfg.custom_05_sub)
+        sp_cust05_code = _set_field_width(QSpinBox(dlg), 120)
+        sp_cust05_code.setObjectName("DialogInput")
+        sp_cust05_code.setRange(0, 999999)
+        sp_cust05_code.setValue(cfg.custom_05_code)
+        sp_cust05_sub = _set_field_width(QSpinBox(dlg), 120)
+        sp_cust05_sub.setObjectName("DialogInput")
+        sp_cust05_sub.setRange(0, 999999)
+        sp_cust05_sub.setValue(cfg.custom_05_sub)
 
         def _snapshot_widgets_to_config() -> BulkConfig:
             """Read all widget values and return a complete BulkConfig."""
@@ -1316,8 +1401,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
         btn_save.clicked.connect(_save)
 
-        l = dlg._content_layout
-        l.setSpacing(10)
+        content_layout = dlg._content_layout
+        content_layout.setSpacing(10)
 
         general_section, general_layout = _section("General")
         general_grid = QGridLayout()
@@ -1373,7 +1458,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         top_sections.addWidget(general_section, 1)
         top_sections.addWidget(custom_section, 1)
         top_sections.addWidget(custom05_section, 1)
-        l.addLayout(top_sections)
+        content_layout.addLayout(top_sections)
 
         bottom_sections = QHBoxLayout()
         bottom_sections.setContentsMargins(0, 0, 0, 0)
@@ -1554,12 +1639,12 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         right_column.addWidget(profiles_section, 1)
         bottom_sections.addLayout(right_column)
 
-        l.addLayout(bottom_sections)
+        content_layout.addLayout(bottom_sections)
 
         r_btn = QHBoxLayout()
         r_btn.addStretch(1)
         r_btn.addWidget(btn_save)
-        l.addLayout(r_btn)
+        content_layout.addLayout(r_btn)
 
         dlg.exec()
 
@@ -1570,12 +1655,18 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             models = []
         txt = f"PmGen\nVersion: {CURRENT_VERSION}\nSupported models: {len(models)}\n—\n"
         # Simple columns
-        for i in range(0, len(models), 4): txt += "".join(s.ljust(12) for s in models[i:i+4]) + "\n"
+        for i in range(0, len(models), 4):
+            txt += "".join(s.ljust(12) for s in models[i:i + 4]) + "\n"
         
         dlg = FramelessDialog(self, "About", self._icon_dir)
-        t = QPlainTextEdit(dlg); t.setReadOnly(True); t.setObjectName("MainEditor"); t.setPlainText(txt)
-        btn = QPushButton("OK", dlg); btn.clicked.connect(dlg.accept)
-        dlg._content_layout.addWidget(t); dlg._content_layout.addWidget(btn)
+        t = QPlainTextEdit(dlg)
+        t.setReadOnly(True)
+        t.setObjectName("MainEditor")
+        t.setPlainText(txt)
+        btn = QPushButton("OK", dlg)
+        btn.clicked.connect(dlg.accept)
+        dlg._content_layout.addWidget(t)
+        dlg._content_layout.addWidget(btn)
         dlg.exec()
 
     @safe_slot
@@ -1644,14 +1735,22 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     @safe_slot
     def _logout(self, *args):
         logging.info("User requested logout.")
-        QSettings().setValue(self.AUTH_REMEMBER_KEY, False); QSettings().setValue(self.AUTH_USERNAME_KEY, "")
+        QSettings().setValue(self.AUTH_REMEMBER_KEY, False)
+        QSettings().setValue(self.AUTH_USERNAME_KEY, "")
         try:
             from pmgen.io import http_client as hc
-            if hasattr(hc, "server_side_logout"): hc.server_side_logout()
-            if hasattr(hc, "SessionPool"): hc.SessionPool.close_all_pools()
+            if hasattr(hc, "server_side_logout"):
+                hc.server_side_logout()
+            if hasattr(hc, "SessionPool"):
+                hc.SessionPool.close_all_pools()
             hc.clear_credentials()
-        except: pass
-        self._signed_in = False; self._current_user = ""; self._session = None; self._update_auth_ui(); self.editor.appendPlainText("[Info] - Logout Successful")
+        except Exception:
+            pass
+        self._signed_in = False
+        self._current_user = ""
+        self._session = None
+        self._update_auth_ui()
+        self.editor.appendPlainText("[Info] - Logout Successful")
 
     def _update_auth_ui(self):
         self.user_label.setText(self._current_user or "(signed in)" if self._signed_in else "Not signed in")
@@ -1659,7 +1758,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     def _toggle_fullscreen(self, checked: bool): self.showFullScreen() if checked else self.showNormal()
 
     def _confirm_exit(self):
-        if CustomMessageBox.confirm(self, "Exit", "Are you sure you want to exit?", self._icon_dir) == "ok": self.close()
+        if CustomMessageBox.confirm(self, "Exit", "Are you sure you want to exit?", self._icon_dir) == "ok":
+            self.close()
 
     def closeEvent(self, ev):
         self._save_id_history()

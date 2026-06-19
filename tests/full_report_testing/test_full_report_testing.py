@@ -6,6 +6,8 @@ import shutil
 from PyQt6.QtCore import QStandardPaths, QCoreApplication
 from pmgen.engine.single_report import generate_from_bytes
 from pmgen.engine.final_report import write_final_summary_pdf
+from pmgen.parsing.parse_pm_report import parse_pm_report
+from pmgen.engine.run_rules import run_rules
 
 @pytest.fixture(autouse=True)
 def setup_test_db(qtbot):
@@ -35,9 +37,6 @@ def setup_test_db(qtbot):
             os.remove(target_db)
         except OSError:
             pass
-
-from pmgen.parsing.parse_pm_report import parse_pm_report
-from pmgen.engine.run_rules import run_rules
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 REPORTS_DIR = os.path.join(TEST_DIR, "..", "example_pm_reports")

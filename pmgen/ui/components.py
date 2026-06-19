@@ -105,25 +105,30 @@ class DialogTitleBar(QWidget):
         lbl = QLabel(title, self)
         lbl.setObjectName("DialogTitleLabel")
 
-        btn_min = QToolButton(self); btn_min.setObjectName("DialogBtn")
+        btn_min = QToolButton(self)
+        btn_min.setObjectName("DialogBtn")
         btn_min.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         btn_min.setIconSize(QSize(14, 14))
-        set_themed_icon(btn_min, "minimize", icon_dir); btn_min.setToolTip("Minimize")
+        set_themed_icon(btn_min, "minimize", icon_dir)
+        btn_min.setToolTip("Minimize")
         btn_min.clicked.connect(self._win.showMinimized)
 
         self._act_max = QAction("Maximize", self)
         set_themed_icon(self._act_max, "fullscreen", icon_dir)
         self._act_max.setCheckable(True)
         self._act_max.triggered.connect(self._toggle_max_restore)
-        btn_max = QToolButton(self); btn_max.setObjectName("DialogBtn")
+        btn_max = QToolButton(self)
+        btn_max.setObjectName("DialogBtn")
         btn_max.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         btn_max.setIconSize(QSize(14, 14))
         btn_max.setDefaultAction(self._act_max)
 
-        btn_close = QToolButton(self); btn_close.setObjectName("DialogBtn")
+        btn_close = QToolButton(self)
+        btn_close.setObjectName("DialogBtn")
         btn_close.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         btn_close.setIconSize(QSize(14, 14))
-        set_themed_icon(btn_close, "exit", icon_dir); btn_close.setToolTip("Close")
+        set_themed_icon(btn_close, "exit", icon_dir)
+        btn_close.setToolTip("Close")
         btn_close.clicked.connect(self._win.close)
 
         layout.addWidget(lbl, 1, Qt.AlignmentFlag.AlignVCenter)
@@ -133,13 +138,17 @@ class DialogTitleBar(QWidget):
         box = QWidget(self)
         box.setObjectName("DialogBtnGroup")
         box.setLayout(right)
-        right.addWidget(btn_min); right.addWidget(btn_max); right.addWidget(btn_close)
+        right.addWidget(btn_min)
+        right.addWidget(btn_max)
+        right.addWidget(btn_close)
         layout.addWidget(box, 0)
         self.setFixedHeight(36)
 
     def _toggle_max_restore(self, checked: bool):
-        if checked: self._win.showMaximized()
-        else: self._win.showNormal()
+        if checked:
+            self._win.showMaximized()
+        else:
+            self._win.showNormal()
 
     def mousePressEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton:

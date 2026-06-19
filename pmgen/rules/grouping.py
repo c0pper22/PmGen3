@@ -140,19 +140,23 @@ class UnitGroupingRule(RuleBase):
 
             # 4. Compare pairs
             for i, super_k in enumerate(sorted_kits):
-                if super_k not in contents: continue
-                
+                if super_k not in contents:
+                    continue
+
                 super_qty = selection.get(super_k, 0)
-                if super_qty <= 0: continue
-                
+                if super_qty <= 0:
+                    continue
+
                 super_items = contents[super_k]
-                
+
                 # Check against all subsequent (smaller/equal) kits
-                for sub_k in sorted_kits[i+1:]:
-                    if sub_k not in contents: continue
-                    
+                for sub_k in sorted_kits[i + 1:]:
+                    if sub_k not in contents:
+                        continue
+
                     sub_qty = selection.get(sub_k, 0)
-                    if sub_qty <= 0: continue
+                    if sub_qty <= 0:
+                        continue
                     
                     sub_items = contents[sub_k]
                     

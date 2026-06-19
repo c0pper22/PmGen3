@@ -5,7 +5,8 @@ from PyQt6.QtWidgets import QWidget, QToolBar, QLabel, QComboBox, QVBoxLayout, Q
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 # Import the classes we want to test
-from pmgen.ui.main_window import BulkSortFilterProxyModel, MainWindow, BulkRunTab
+from pmgen.ui.main_window import MainWindow, BulkRunTab
+from pmgen.ui.bulk_run import BulkSortFilterProxyModel
 from pmgen.ui.bulk_model import BulkQueueModel
 from pmgen.ui.workers import BulkConfig
 
@@ -44,7 +45,7 @@ def mock_main_window(qtbot, monkeypatch):
             return QToolBar(parent)
 
     class MockInventoryTab(QWidget):
-        def __init__(self, parent=None, **kwargs):
+        def __init__(self, parent=None, *args, **kwargs):
             super().__init__(parent)
             self.model = MagicMock()
             self.model.get_dataframe.return_value = None
@@ -53,10 +54,12 @@ def mock_main_window(qtbot, monkeypatch):
             return "dummy_path"
 
     monkeypatch.setattr("pmgen.ui.main_window.UIFactory", MockUIFactory)
-    monkeypatch.setattr("pmgen.ui.main_window.InventoryTab", MockInventoryTab)
+    monkeypatch.setattr("pmgen.ui.main_window.InventoryPage", MockInventoryTab)
     monkeypatch.setattr("pmgen.ui.main_window.QTimer.singleShot", MagicMock())
-    
+
     window = MainWindow()
+    # Mock tab_tools for closeEvent teardown
+    window.tab_tools = MockInventoryTab(window)
     qtbot.addWidget(window)
     return window
 
