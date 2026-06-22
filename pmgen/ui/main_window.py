@@ -12,8 +12,8 @@ from PyQt6.QtCore import (
     QObject
 )
 from PyQt6.QtGui import (
-    QIcon, QKeySequence, 
-    QShortcut 
+    QIcon, QKeySequence, QShortcut,
+    QPainter, QPen, QColor, QConicalGradient, QPainterPath,
 )
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QPlainTextEdit,
@@ -24,10 +24,16 @@ from PyQt6.QtWidgets import (
 
 # Imports from our new split files
 from pmgen.system.wrappers import safe_slot
-from .theme import SPACING_LG, SPACING_MD
 from .theme import (
-    RADIUS_LG, CORNER_ROUNDNESS_KEY, CORNER_ROUNDNESS_DEFAULT,
-    _corner_scale, _scaled_radius,
+    COLOR_PRIMARY,
+    DARK_PRIMARY_CONTAINER,
+    SPACING_LG,
+    SPACING_MD,
+    RADIUS_LG,
+    CORNER_ROUNDNESS_KEY,
+    CORNER_ROUNDNESS_DEFAULT,
+    _corner_scale,
+    _scaled_radius,
 )
 from .components import (
     FramelessDialog, CustomMessageBox, ResizeState, LoadingDialog
@@ -86,10 +92,82 @@ BULK_SETTINGS_TOOLTIPS = {
     "unpack_max_age": "Skip serials unpacked more than this many months ago.",
 }
 
+
+class _StartupArcOverlay(QWidget):
+    """A transparent child overlay that paints a single smooth accent arc
+    travelling around the rounded border of its parent widget.
+
+    The arc is drawn with a conic gradient that fades from transparent to
+    the accent colour and back, so a soft "comet" of light glides around
+    the perimeter (including smoothly through the corners) instead of
+    individual sides lighting up.
+
+    The overlay paints onto itself only, so it never triggers a repaint of
+    the parent and cannot cause the recursive-repaint warning that the
+    earlier paint-hook approach produced.
+    """
+
+    # Fraction of the full sweep that is lit (the "comet tail" length).
+    _ARC_FRACTION = 0.22
+
+    def __init__(self, parent: QWidget, accent: QColor, radius: int, width: int = 3) -> None:
+        super().__init__(parent)
+        self._accent = accent
+        self._radius = radius
+        self._width = width
+        self._angle = 0.0
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setGeometry(parent.rect())
+
+    def set_angle(self, angle: float) -> None:
+        self._angle = angle
+        self.update()
+
+    def paintEvent(self, _event) -> None:
+        w = self.width()
+        h = self.height()
+        if w <= self._width or h <= self._width:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Conic gradient centred on the widget; the lit band rotates with angle.
+        grad = QConicalGradient(w / 2.0, h / 2.0, -self._angle)
+        clear = QColor(self._accent)
+        clear.setAlpha(0)
+        head = QColor(self._accent)
+        frac = self._ARC_FRACTION
+        grad.setColorAt(0.0, head)
+        grad.setColorAt(frac * 0.5, QColor(self._accent.red(), self._accent.green(), self._accent.blue(), 140))
+        grad.setColorAt(frac, clear)
+        grad.setColorAt(1.0, head)
+
+        pen = QPen(grad, self._width)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        inset = self._width / 2.0
+        path = QPainterPath()
+        path.addRoundedRect(
+            inset,
+            inset,
+            w - self._width,
+            h - self._width,
+            self._radius,
+            self._radius,
+        )
+        painter.drawPath(path)
+        painter.end()
+
+
 class _AutoLoginWorker(QObject):
     """Performs auto-login HTTP requests on a background thread."""
     finished = pyqtSignal()
-    succeeded = pyqtSignal(object, str)  # (session, username)
+    succeeded = pyqtSignal(object, str, object)  # (session, username, customer_map)
     failed = pyqtSignal(str)            # error message
 
     def __init__(self, username: str, parent=None):
@@ -102,7 +180,14 @@ class _AutoLoginWorker(QObject):
             from pmgen.io import http_client as hc
             sess = requests.Session()
             hc.login(sess)
-            self.succeeded.emit(sess, self._username)
+            # Fetch the customer map here, on the worker thread, so the heavy
+            # multi-page HTTP/HTML work never blocks the UI event loop.
+            try:
+                customer_map = hc.get_customer_map_after_login(sess)
+            except Exception:
+                logging.exception("Auto-login: failed to fetch customer map")
+                customer_map = {}
+            self.succeeded.emit(sess, self._username, customer_map)
         except Exception as e:
             self.failed.emit(str(e))
         finally:
@@ -204,6 +289,13 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self._ribon_check_thread: QThread | None = None
         self._ribon_check_worker: RibonCheckWorker | None = None
 
+        # STARTUP ANIMATION STATE
+        self._startup_timer: QTimer | None = None
+        self._startup_overlay: _StartupArcOverlay | None = None
+        self._startup_angle: float = 0.0
+        self._startup_pending: set[str] = set()
+        self._startup_timeout: QTimer | None = None
+
         # Shortcuts
         clear_shortcut = QShortcut(QKeySequence("Ctrl+L"), self)
         clear_shortcut.activated.connect(self._clear_output_window)
@@ -211,6 +303,8 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         generate_shortcut.activated.connect(self._on_generate_clicked)
 
         self._update_auth_ui()
+
+        self._start_startup_animation()
         QTimer.singleShot(500, self._attempt_auto_login)
 
         QTimer.singleShot(1500, lambda: self._start_update_check(silent=True))
@@ -220,9 +314,98 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self.apply_window_roundness(self._get_corner_roundness())
 
     # =========================================================================
+    #  Startup Animation
+    # =========================================================================
+
+    def _start_startup_animation(self) -> None:
+        """Begin the smooth orbiting accent-arc animation on the secondary bar.
+
+        A soft "comet" of accent-coloured light glides continuously around
+        the rounded border (corners included) via a conic-gradient overlay,
+        so no individual side appears to light up on its own.  The animation
+        runs until all three startup tasks (auto-login, update check, ribon
+        check) have settled, or until the 30-second safety timeout fires.
+        """
+        self._startup_pending = {"login", "update", "ribon"}
+        self._startup_angle = 0.0
+
+        bar = getattr(self, "_secondary_bar", None)
+        if bar is None:
+            self._startup_pending.clear()
+            return
+
+        manager = getattr(self, "theme_manager", None)
+        accent_hex = (
+            DARK_PRIMARY_CONTAINER
+            if (manager is not None and manager.is_dark)
+            else COLOR_PRIMARY
+        )
+        accent = QColor(accent_hex)
+        scale = _corner_scale(self._get_corner_roundness())
+        radius = _scaled_radius(RADIUS_LG, scale)
+
+        self._startup_overlay = _StartupArcOverlay(bar, accent, radius, width=3)
+        self._startup_overlay.setGeometry(bar.rect())
+        self._startup_overlay.raise_()
+        self._startup_overlay.show()
+
+        self._startup_timer = QTimer(self)
+        self._startup_timer.setInterval(16)
+        self._startup_timer.timeout.connect(self._startup_tick)
+        self._startup_timer.start()
+
+        # Safety timeout: force-stop after 30 seconds
+        self._startup_timeout = QTimer(self)
+        self._startup_timeout.setSingleShot(True)
+        self._startup_timeout.timeout.connect(self._stop_startup_animation)
+        self._startup_timeout.start(30_000)
+
+    def _startup_tick(self) -> None:
+        """Advance the orbiting arc and repaint the overlay.
+
+        Keeps the overlay sized to the bar (in case of a resize) and nudges
+        the rotation angle so the lit band glides smoothly around the border.
+        """
+        overlay = self._startup_overlay
+        bar = getattr(self, "_secondary_bar", None)
+        if overlay is None or bar is None:
+            return
+
+        if overlay.size() != bar.size():
+            overlay.setGeometry(bar.rect())
+
+        # ~4 deg per 16 ms tick -> full orbit in ~1.5 s, very smooth at 60 fps.
+        self._startup_angle = (self._startup_angle + 4.0) % 360
+        overlay.set_angle(self._startup_angle)
+
+    def _stop_startup_animation(self) -> None:
+        """Stop the animation and remove the overlay."""
+        if self._startup_timer is not None:
+            self._startup_timer.stop()
+            self._startup_timer.deleteLater()
+            self._startup_timer = None
+
+        if self._startup_timeout is not None:
+            self._startup_timeout.stop()
+            self._startup_timeout.deleteLater()
+            self._startup_timeout = None
+
+        if self._startup_overlay is not None:
+            self._startup_overlay.hide()
+            self._startup_overlay.deleteLater()
+            self._startup_overlay = None
+
+        self._startup_pending.clear()
+    def _on_startup_task_complete(self, task: str) -> None:
+        """Mark one startup task as settled; stop animation when all done."""
+        self._startup_pending.discard(task)
+        if not self._startup_pending:
+            self._stop_startup_animation()
+
+    # =========================================================================
     #  Tab Management
     # =========================================================================
-    
+
     def _on_tab_close_requested(self, index):
         widget = self.tabs.widget(index)
         
@@ -491,6 +674,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
     @pyqtSlot(bool, object)
     def _on_ribon_check_finished(self, update_available: bool, result: object) -> None:
         """Handle the RIBON check result on the main thread."""
+        self._on_startup_task_complete("ribon")
         if update_available:
             remote_ver = result.get("remote_version", "?")  # type: ignore[attr-defined]
             local_ver = result.get("local_version", "?")  # type: ignore[attr-defined]
@@ -546,6 +730,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
     @pyqtSlot(bool, str, str)
     def _on_check_finished(self, found, version_tag, url):
+        self._on_startup_task_complete("update")
         if self._update_thread is not None:
             self._update_thread.quit()  # Stop the check thread
         
@@ -564,6 +749,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
     @pyqtSlot(str)
     def _on_update_error(self, msg):
+        self._on_startup_task_complete("update")
         # Errors can come from the check thread OR the download/extract thread.
         # The check thread may already be gone, so guard every reference.
         if self._update_thread is not None:
@@ -1686,14 +1872,17 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
     def _attempt_auto_login(self):
         if self._auto_login_attempted or self._signed_in:
+            self._on_startup_task_complete("login")
             return
         s = QSettings()
         if not bool(s.value(self.AUTH_REMEMBER_KEY, False, bool)):
             self._auto_login_attempted = True
+            self._on_startup_task_complete("login")
             return
         u = s.value(self.AUTH_USERNAME_KEY, "", str)
         if not u:
             self._auto_login_attempted = True
+            self._on_startup_task_complete("login")
             return
 
         self._auto_login_attempted = True
@@ -1710,20 +1899,19 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         self._login_worker.failed.connect(self._on_auto_login_failure)
         self._login_worker.finished.connect(self._login_thread.quit)
         self._login_worker.finished.connect(self._login_worker.deleteLater)
+        self._login_worker.finished.connect(lambda: self._on_startup_task_complete("login"))
         self._login_thread.finished.connect(self._login_thread.deleteLater)
         self._login_thread.start()
 
-    @pyqtSlot(object, str)
-    def _on_auto_login_success(self, session, username):
+    @pyqtSlot(object, str, object)
+    def _on_auto_login_success(self, session, username, customer_map):
         self._session = session
         self._signed_in = True
         self._current_user = username
         self._update_auth_ui()
         self.editor.appendPlainText(f"[Auto-Login] {username} — success")
-        try:
-            self.customerMap = get_customer_map_after_login(session)
-        except Exception:
-            pass
+        if customer_map:
+            self.customerMap = customer_map
 
     @pyqtSlot(str)
     def _on_auto_login_failure(self, error_msg):
@@ -1762,6 +1950,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             self.close()
 
     def closeEvent(self, ev):
+        self._stop_startup_animation()
         self._save_id_history()
         
         df = self.tab_tools.model.get_dataframe()
