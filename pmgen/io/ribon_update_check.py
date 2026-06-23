@@ -126,6 +126,47 @@ def _read_setup_info_isolated(db_path: str) -> dict[str, str | None]:
     env = _os.environ.copy()
     env["RIBON_DIRECT_DB_READ"] = "1"
 
+    if getattr(sys, "frozen", False):
+        # Frozen build: sys.executable is the application EXE, not a Python
+        # interpreter, so we cannot pass "-c <code>". Re-launch the EXE with
+        # sentinel environment variables; the application entry point detects
+        # them, runs the DB read as a helper, writes the result to a temp
+        # file, and exits before any GUI is created.
+        import tempfile as _tempfile
+
+        result_fd, result_path = _tempfile.mkstemp(suffix=".json", prefix="ribon_db_")
+        _os.close(result_fd)
+        env["RIBON_DB_PATH"] = db_path
+        env["RIBON_DB_RESULT_PATH"] = result_path
+
+        try:
+            completed = subprocess.run(
+                [sys.executable],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=False,
+            )
+            try:
+                with open(result_path, "r", encoding="utf-8") as result_file:
+                    payload = result_file.read().strip()
+            except OSError:
+                payload = ""
+
+            if payload:
+                try:
+                    return _json.loads(payload)
+                except _json.JSONDecodeError:
+                    pass
+
+            message = (completed.stderr or completed.stdout or "unknown error").strip()
+            raise RuntimeError(f"RIBON DB helper failed: {message}")
+        finally:
+            try:
+                _os.remove(result_path)
+            except OSError:
+                pass
+
     proj_root = _os.path.dirname(
         _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
     )

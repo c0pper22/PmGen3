@@ -53,6 +53,35 @@ def bootstrap_database():
         logging.critical(f"Master database not found at {os.path.abspath(source_path)}")
 
 def main() -> int:
+    # Frozen "helper mode": when the RIBON update checker re-launches this EXE
+    # to read the Access database in an isolated process, sys.executable is the
+    # application EXE (not a Python interpreter). Detect the sentinel env vars,
+    # perform the DB read, write the result to the requested file, and exit
+    # BEFORE creating any QApplication so a second window never appears.
+    if os.environ.get("RIBON_DIRECT_DB_READ") == "1":
+        import json
+
+        db_path = os.environ.get("RIBON_DB_PATH", "")
+        result_path = os.environ.get("RIBON_DB_RESULT_PATH", "")
+        try:
+            from pmgen.io.ribon_update_check import _read_setup_info
+
+            result = _read_setup_info(db_path)
+            payload = json.dumps(result)
+            if result_path:
+                with open(result_path, "w", encoding="utf-8") as result_file:
+                    result_file.write(payload)
+            return 0
+        except Exception as exc:  # noqa: BLE001 - report failure to parent process
+            if result_path:
+                try:
+                    with open(result_path, "w", encoding="utf-8") as result_file:
+                        result_file.write("")
+                except OSError:
+                    pass
+            print(str(exc), file=sys.stderr)
+            return 1
+
     setup_logging()
     install_crash_handlers()
 
