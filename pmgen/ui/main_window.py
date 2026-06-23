@@ -1219,6 +1219,107 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         dlg.exec()
 
     @safe_slot
+    def _open_remotetech_dialog(self, *args):
+        """Open a dialog to save or remove RemoteTech credentials via keyring."""
+        from pmgen.io.http_client import (
+            get_remotetech_username,
+            get_remotetech_password,
+            save_remotetech_credentials,
+            clear_remotetech_credentials,
+        )
+
+        REMOTETECH_BIN_KEY = "remotetech/bin_id"
+        REMOTETECH_WAREHOUSE_KEY = "remotetech/warehouse_id"
+
+        dlg = FramelessDialog(self, "Link RemoteTech", self._icon_dir)
+
+        u_in = QLineEdit(dlg)
+        u_in.setObjectName("DialogInput")
+        u_in.setPlaceholderText("Username")
+        saved_user = get_remotetech_username()
+        if saved_user:
+            u_in.setText(saved_user)
+
+        p_in = QLineEdit(dlg)
+        p_in.setEchoMode(QLineEdit.EchoMode.Password)
+        p_in.setObjectName("DialogInput")
+        p_in.setPlaceholderText("Password")
+        saved_pass = get_remotetech_password()
+        if saved_pass:
+            p_in.setText(saved_pass)
+
+        bin_in = QSpinBox(dlg)
+        bin_in.setObjectName("DialogInput")
+        bin_in.setRange(1, 999999)
+        bin_in.setValue(QSettings().value(REMOTETECH_BIN_KEY, 1, int))
+        bin_in.setToolTip("BIN ID (positive integer)")
+
+        warehouse_in = QSpinBox(dlg)
+        warehouse_in.setObjectName("DialogInput")
+        warehouse_in.setRange(1, 999999)
+        warehouse_in.setValue(QSettings().value(REMOTETECH_WAREHOUSE_KEY, 1, int))
+        warehouse_in.setToolTip("WAREHOUSE ID (positive integer)")
+
+        status_lbl = QLabel("", dlg)
+        status_lbl.setObjectName("DialogLabel")
+        status_lbl.setWordWrap(True)
+
+        btn_save = QPushButton("Save Credentials", dlg)
+        btn_save.setDefault(True)
+
+        def _do_save():
+            u = u_in.text().strip()
+            p = p_in.text()
+            if not u or not p:
+                status_lbl.setText("Username and password are required.")
+                return
+            try:
+                save_remotetech_credentials(u, p)
+                QSettings().setValue(REMOTETECH_BIN_KEY, bin_in.value())
+                QSettings().setValue(REMOTETECH_WAREHOUSE_KEY, warehouse_in.value())
+                status_lbl.setText("RemoteTech credentials saved.")
+                logging.info("RemoteTech credentials saved for user: %s", u)
+            except Exception as exc:
+                status_lbl.setText(f"Failed to save: {exc}")
+                logging.exception("Failed to save RemoteTech credentials")
+
+        btn_remove = QPushButton("Remove Credentials", dlg)
+
+        def _do_remove():
+            try:
+                clear_remotetech_credentials()
+                u_in.clear()
+                p_in.clear()
+                bin_in.setValue(1)
+                warehouse_in.setValue(1)
+                QSettings().remove(REMOTETECH_BIN_KEY)
+                QSettings().remove(REMOTETECH_WAREHOUSE_KEY)
+                status_lbl.setText("RemoteTech credentials removed.")
+                logging.info("RemoteTech credentials removed")
+            except Exception as exc:
+                status_lbl.setText(f"Failed to remove: {exc}")
+                logging.exception("Failed to remove RemoteTech credentials")
+
+        btn_save.clicked.connect(_do_save)
+        btn_remove.clicked.connect(_do_remove)
+
+        dlg._content_layout.addWidget(QLabel("Username", dlg))
+        dlg._content_layout.addWidget(u_in)
+        dlg._content_layout.addWidget(QLabel("Password", dlg))
+        dlg._content_layout.addWidget(p_in)
+        dlg._content_layout.addWidget(QLabel("BIN ID", dlg))
+        dlg._content_layout.addWidget(bin_in)
+        dlg._content_layout.addWidget(QLabel("WAREHOUSE ID", dlg))
+        dlg._content_layout.addWidget(warehouse_in)
+        dlg._content_layout.addWidget(status_lbl)
+        row = QHBoxLayout()
+        row.addWidget(btn_remove)
+        row.addStretch(1)
+        row.addWidget(btn_save)
+        dlg._content_layout.addLayout(row)
+        dlg.exec()
+
+    @safe_slot
     def _open_life_basis_dialog(self, *args):
         dlg = FramelessDialog(self, "Life Basis", self._icon_dir)
         lbl = QLabel("Choose counter basis (fallback to other if missing).", dlg)

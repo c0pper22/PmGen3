@@ -94,6 +94,9 @@ class UIFactory:
         act_catalog_editor = QAction("Catalog Editor", window)
         act_catalog_editor.triggered.connect(window._open_catalog_editor)
         settings_menu.addAction(act_catalog_editor)
+        act_remotetech = QAction("Link RemoteTech", window)
+        act_remotetech.triggered.connect(window._open_remotetech_dialog)
+        settings_menu.addAction(act_remotetech)
         
         settings_btn.setMenu(settings_menu)
 

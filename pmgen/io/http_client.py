@@ -105,6 +105,62 @@ def clear_credentials() -> None:
         except Exception:
             pass
 
+# --- RemoteTech credential helpers ---
+
+REMOTETECH_USERNAME_KEY = "remotetech_username"
+
+
+def get_remotetech_username() -> str | None:
+    """Return the saved RemoteTech username, or None."""
+    if not keyring:
+        return None
+    try:
+        return keyring.get_password(SERVICE_NAME, REMOTETECH_USERNAME_KEY)
+    except Exception:
+        return None
+
+
+def get_remotetech_password() -> str | None:
+    """Return the saved RemoteTech password, or None."""
+    if not keyring:
+        return None
+    try:
+        u = get_remotetech_username()
+        if not u:
+            return None
+        return keyring.get_password(SERVICE_NAME, u)
+    except Exception:
+        return None
+
+
+def save_remotetech_credentials(username: str, password: str) -> None:
+    """Persist RemoteTech credentials to the system keyring."""
+    if not keyring:
+        raise RuntimeError("Install 'keyring' with: pip install keyring")
+    if not username or not password:
+        raise ValueError("Username and Password cannot be empty.")
+    keyring.set_password(SERVICE_NAME, REMOTETECH_USERNAME_KEY, username)
+    keyring.set_password(SERVICE_NAME, username, password)
+
+
+def clear_remotetech_credentials() -> None:
+    """Remove RemoteTech credentials from the system keyring."""
+    if not keyring:
+        return
+    try:
+        u = keyring.get_password(SERVICE_NAME, REMOTETECH_USERNAME_KEY)
+    except Exception:
+        u = None
+    try:
+        keyring.delete_password(SERVICE_NAME, REMOTETECH_USERNAME_KEY)
+    except Exception:
+        pass
+    if u:
+        try:
+            keyring.delete_password(SERVICE_NAME, u)
+        except Exception:
+            pass
+
 # --- Login helpers (unchanged behavior) ---
 
 def _extract_anti_forgery(html: str) -> str:

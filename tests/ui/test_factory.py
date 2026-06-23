@@ -47,6 +47,9 @@ class _ToolbarWindow(QMainWindow):
     def _open_catalog_editor(self):
         pass
 
+    def _open_remotetech_dialog(self):
+        pass
+
     def _get_alerts_enabled(self):
         return True
 
