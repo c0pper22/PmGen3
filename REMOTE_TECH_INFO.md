@@ -1,8 +1,9 @@
 BIN IDS:
 
-130 = Main
-
-WAREHOUSE IDS:
-
-42 = Srv-TS Kyle
-...
+59 = CODIE
+57 = JOSH
+131 = BRIAN
+130 = KYLE
+129 = WILL
+180 = MATT
+210 = TREVOR
