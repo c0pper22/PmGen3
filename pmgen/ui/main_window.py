@@ -39,7 +39,7 @@ from .components import (
     FramelessDialog, CustomMessageBox, ResizeState, LoadingDialog
 )
 from .highlighter import OutputHighlighter
-from .workers import BulkConfig, SingleReportWorker
+from .workers import BulkConfig, SingleReportWorker, RemoteTechWorker
 from .profile_store import (
     DEFAULT_PROFILE_NAME,
     list_profile_names,
@@ -271,6 +271,10 @@ class MainWindow(WindowResizeMixin, QMainWindow):
 
         ui_factory = UIFactory(self._icon_dir)
         self.tab_home = SingleReportPage(self, self._icon_dir, self)
+        # Wire the "Add Parts to Call" button in the widget report view
+        widget_view = getattr(self, '_widget_view', None)
+        if widget_view is not None:
+            widget_view.on_add_parts_to_call = self._on_add_parts_to_call
         self._apply_colorized_highlighter()
         self.tabs.add_pinned_tab(self.tab_home, "Single")
 
@@ -1318,6 +1322,239 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         row.addWidget(btn_save)
         dlg._content_layout.addLayout(row)
         dlg.exec()
+
+    # ── RemoteTech "Add Parts to Call" flow ─────────────────────────────────
+
+    @safe_slot
+    def _on_add_parts_to_call(self, *args) -> None:
+        """Handler for the 'Add Parts to Call' button in the widget report view."""
+        from pmgen.io.http_client import (
+            get_remotetech_username,
+            get_remotetech_password,
+        )
+
+        username = get_remotetech_username()
+        password = get_remotetech_password()
+        if not username or not password:
+            CustomMessageBox.warn(
+                self,
+                "RemoteTech Not Linked",
+                "Please configure your RemoteTech credentials first.\n\n"
+                "Go to Settings → Link RemoteTech.",
+                self._icon_dir,
+            )
+            return
+
+        bin_id = QSettings().value("remotetech/bin_id", 1, int)
+        warehouse_id = QSettings().value("remotetech/warehouse_id", 1, int)
+
+        # Gather parts from the cached report data
+        data = getattr(self, '_cached_report_data', None)
+        if data is None:
+            return
+
+        part_entries: list[tuple[str, int]] = []
+        for entry in data.final_parts_over_100:
+            part_entries.append((entry.part_number, entry.qty))
+        for entry in data.final_parts_threshold:
+            part_entries.append((entry.part_number, entry.qty))
+
+        if not part_entries:
+            return
+
+        # Show loading dialog
+        self._rt_loading = LoadingDialog(
+            parent=self,
+            title="RemoteTech",
+            message="Logging in and fetching active calls…",
+            icon_dir=self._icon_dir,
+        )
+        self._rt_loading.show()
+
+        # Phase 1: Login + fetch calls
+        self._rt_phase1_thread = QThread()
+        self._rt_phase1_worker = RemoteTechWorker(
+            username=username,
+            password=password,
+            bin_id=bin_id,
+            warehouse_id=warehouse_id,
+            part_entries=part_entries,
+        )
+        self._rt_phase1_worker.moveToThread(self._rt_phase1_thread)
+
+        self._rt_phase1_thread.started.connect(self._rt_phase1_worker.run_login_and_fetch_calls)
+        self._rt_phase1_worker.calls_ready.connect(self._on_rt_calls_ready)
+        self._rt_phase1_worker.error.connect(self._on_rt_error)
+
+        self._rt_phase1_worker.calls_ready.connect(self._rt_phase1_thread.quit)
+        self._rt_phase1_worker.error.connect(self._rt_phase1_thread.quit)
+        self._rt_phase1_thread.finished.connect(self._rt_phase1_thread.deleteLater)
+        self._rt_phase1_worker.calls_ready.connect(self._rt_phase1_worker.deleteLater)
+        self._rt_phase1_worker.error.connect(self._rt_phase1_worker.deleteLater)
+
+        self._rt_phase1_thread.start()
+
+    @pyqtSlot(object)
+    def _on_rt_calls_ready(self, calls) -> None:
+        """Phase 2: Show call picker dialog."""
+        if hasattr(self, '_rt_loading') and self._rt_loading:
+            self._rt_loading.accept()
+            self._rt_loading = None
+
+        if not calls:
+            CustomMessageBox.info(
+                self,
+                "No Active Calls",
+                "You have no active calls in your RemoteTech queue.",
+                self._icon_dir,
+            )
+            return
+
+        # Build and show call selection dialog
+        dlg = FramelessDialog(self, "Select Call", self._icon_dir)
+        dlg.setMinimumSize(520, 360)
+
+        from pmgen.io.remotetech_api import Call as RTCall
+
+        call_list = QTableWidget(len(calls), 3, dlg)
+        call_list.setObjectName("DialogTable")
+        call_list.setHorizontalHeaderLabels(["Call #", "Location", "Description"])
+        call_list.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        call_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        call_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        call_list.verticalHeader().setVisible(False)
+        call_list.horizontalHeader().setStretchLastSection(True)
+        call_list.setColumnWidth(0, 100)
+        call_list.setColumnWidth(1, 180)
+
+        for i, c in enumerate(calls):
+            c: RTCall
+            call_list.setItem(i, 0, QTableWidgetItem(c.call_number))
+            call_list.setItem(i, 1, QTableWidgetItem(c.location))
+            call_list.setItem(i, 2, QTableWidgetItem(c.description))
+            call_list.setRowHeight(i, 28)
+
+        if calls:
+            call_list.selectRow(0)
+
+        status_lbl = QLabel("Select an active call to add parts to.", dlg)
+        status_lbl.setObjectName("DialogLabel")
+        status_lbl.setWordWrap(True)
+
+        btn_select = QPushButton("Add Parts to Selected Call", dlg)
+        btn_select.setDefault(True)
+
+        btn_cancel = QPushButton("Cancel", dlg)
+
+        def _do_select():
+            row = call_list.currentRow()
+            if row < 0:
+                status_lbl.setText("Please select a call first.")
+                return
+
+            selected_call: RTCall = calls[row]
+            dlg.accept()
+
+            # Phase 3: Add parts to selected call
+            self._start_rt_add_parts(selected_call)
+
+        btn_select.clicked.connect(_do_select)
+        btn_cancel.clicked.connect(dlg.reject)
+
+        dlg._content_layout.addWidget(QLabel("Active Calls:", dlg))
+        dlg._content_layout.addWidget(call_list, 1)
+        dlg._content_layout.addWidget(status_lbl)
+        row = QHBoxLayout()
+        row.addWidget(btn_cancel)
+        row.addStretch(1)
+        row.addWidget(btn_select)
+        dlg._content_layout.addLayout(row)
+        dlg.exec()
+
+    def _start_rt_add_parts(self, selected_call) -> None:
+        """Phase 3: Run the add-parts worker for the selected call."""
+        from pmgen.io.http_client import (
+            get_remotetech_username,
+            get_remotetech_password,
+        )
+        from pmgen.io.remotetech_api import Call as RTCall
+
+        call: RTCall = selected_call
+
+        username = get_remotetech_username() or ""
+        password = get_remotetech_password() or ""
+        bin_id = QSettings().value("remotetech/bin_id", 1, int)
+        warehouse_id = QSettings().value("remotetech/warehouse_id", 1, int)
+
+        data = getattr(self, '_cached_report_data', None)
+        if data is None:
+            return
+
+        part_entries: list[tuple[str, int]] = []
+        for entry in data.final_parts_over_100:
+            part_entries.append((entry.part_number, entry.qty))
+        for entry in data.final_parts_threshold:
+            part_entries.append((entry.part_number, entry.qty))
+
+        self._rt_loading = LoadingDialog(
+            parent=self,
+            title="RemoteTech",
+            message=f"Adding parts to call {call.call_number}…",
+            icon_dir=self._icon_dir,
+        )
+        self._rt_loading.show()
+
+        self._rt_phase2_thread = QThread()
+        self._rt_phase2_worker = RemoteTechWorker(
+            username=username,
+            password=password,
+            bin_id=bin_id,
+            warehouse_id=warehouse_id,
+            part_entries=part_entries,
+            selected_call_id=call.call_id,
+        )
+        self._rt_phase2_worker.moveToThread(self._rt_phase2_thread)
+
+        self._rt_phase2_thread.started.connect(self._rt_phase2_worker.run_add_parts)
+        self._rt_phase2_worker.part_added.connect(self._on_rt_part_added)
+        self._rt_phase2_worker.part_failed.connect(self._on_rt_part_failed)
+        self._rt_phase2_worker.finished.connect(self._on_rt_finished)
+        self._rt_phase2_worker.error.connect(self._on_rt_error)
+
+        self._rt_phase2_worker.finished.connect(self._rt_phase2_thread.quit)
+        self._rt_phase2_worker.error.connect(self._rt_phase2_thread.quit)
+        self._rt_phase2_thread.finished.connect(self._rt_phase2_thread.deleteLater)
+        self._rt_phase2_worker.finished.connect(self._rt_phase2_worker.deleteLater)
+        self._rt_phase2_worker.error.connect(self._rt_phase2_worker.deleteLater)
+
+        self._rt_phase2_thread.start()
+
+    @pyqtSlot(str)
+    def _on_rt_part_added(self, part_number: str) -> None:
+        """Log a successfully added part."""
+        self.editor.appendPlainText(f"[RemoteTech] Added: {part_number}")
+
+    @pyqtSlot(str, str)
+    def _on_rt_part_failed(self, part_number: str, error_msg: str) -> None:
+        """Log a failed part."""
+        self.editor.appendPlainText(f"[RemoteTech] Failed: {part_number} — {error_msg}")
+
+    @pyqtSlot(str)
+    def _on_rt_finished(self, summary: str) -> None:
+        """Clean up after the add-parts phase completes."""
+        if hasattr(self, '_rt_loading') and self._rt_loading:
+            self._rt_loading.accept()
+            self._rt_loading = None
+        self.editor.appendPlainText(f"[RemoteTech] {summary}")
+
+    @pyqtSlot(str)
+    def _on_rt_error(self, error_msg: str) -> None:
+        """Handle RemoteTech errors."""
+        if hasattr(self, '_rt_loading') and self._rt_loading:
+            self._rt_loading.accept()
+            self._rt_loading = None
+        self.editor.appendPlainText(f"[RemoteTech] Error: {error_msg}")
+        CustomMessageBox.warn(self, "RemoteTech Error", error_msg, self._icon_dir)
 
     @safe_slot
     def _open_life_basis_dialog(self, *args):

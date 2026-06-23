@@ -11,6 +11,8 @@ import calendar
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from typing import Dict
 
+from pmgen.io.remotetech_api import DeliveryMethod, UsageStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -88,6 +90,129 @@ class SingleReportWorker(QObject):
 
         except Exception as e:
             self.error.emit(f"Failed to generate report for {self.serial}:\n{str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# RemoteTech worker — fetches active calls and adds parts on a background thread
+# ---------------------------------------------------------------------------
+
+class RemoteTechWorker(QObject):
+    """Performs RemoteTech API operations on a background thread.
+
+    Signals
+    -------
+    calls_ready : list[object]
+        Emitted with the list of active Call objects after login + fetch.
+    part_added : str
+        Emitted after each part is successfully added (part_number).
+    part_failed : str
+        Emitted when a part lookup or add fails (part_number).
+    finished : str
+        Emitted when all parts have been processed.
+    error : str
+        Emitted on login or fetch failure.
+    """
+
+    calls_ready = pyqtSignal(object)  # list[Call]
+    part_added = pyqtSignal(str)
+    part_failed = pyqtSignal(str, str)  # part_number, error_message
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str)
+
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        bin_id: int,
+        warehouse_id: int,
+        part_entries: list[tuple[str, int]],  # (part_number, quantity)
+        selected_call_id: str = "",
+    ):
+        super().__init__()
+        self._username = username
+        self._password = password
+        self._bin_id = bin_id
+        self._warehouse_id = warehouse_id
+        self._part_entries = part_entries
+        self._selected_call_id = selected_call_id
+        self._api: object | None = None
+
+    def run_login_and_fetch_calls(self) -> None:
+        """Phase 1: Login to RemoteTech and fetch active calls."""
+        try:
+            from pmgen.io.remotetech_api import RemoteTechAPI, REMOTETECH_COMPANY
+
+            self._api = RemoteTechAPI(company=REMOTETECH_COMPANY)
+            result = self._api.login(self._username, self._password)
+            if not result.success:
+                self.error.emit(f"RemoteTech login failed: {result.message}")
+                return
+
+            calls = self._api.get_users_active_calls()
+            self.calls_ready.emit(calls)
+        except Exception as exc:
+            self.error.emit(f"RemoteTech error: {exc}")
+            logger.exception("RemoteTech login/fetch failed")
+
+    def run_add_parts(self) -> None:
+        """Phase 2: Look up each part number and add it to the selected call."""
+        from pmgen.io.remotetech_api import RemoteTechAPI, REMOTETECH_COMPANY
+
+        # Login if we don't already have an active session
+        if self._api is None:
+            self._api = RemoteTechAPI(company=REMOTETECH_COMPANY)
+            result = self._api.login(self._username, self._password)
+            if not result.success:
+                self.error.emit(f"RemoteTech login failed: {result.message}")
+                return
+            # Populate queue ID so Rtagent header is set for subsequent API calls
+            self._api.get_users_active_calls()
+
+        api: RemoteTechAPI = self._api  # type: ignore[assignment]
+
+        # Deduplicate parts by part number, summing quantities
+        merged: dict[str, int] = {}
+        for part_number, quantity in self._part_entries:
+            merged[part_number] = merged.get(part_number, 0) + quantity
+
+        added_count = 0
+        failed_count = 0
+
+        for part_number, quantity in merged.items():
+            if QThread.currentThread().isInterruptionRequested():
+                break
+
+            try:
+                # Search all bins + Inventory (not just the user's current bin)
+                # so every part resolves to an ItemID; the part is still added
+                # to the configured bin/warehouse below.
+                lookup = api.part_number_lookup(part_number, bin_search=False)
+                if lookup is None:
+                    self.part_failed.emit(part_number, "Part not found in RemoteTech")
+                    failed_count += 1
+                    continue
+
+                api.add_part_to_call(
+                    call_id=self._selected_call_id,
+                    item_id=lookup.item_id,
+                    bin_id=self._bin_id,
+                    warehouse_id=self._warehouse_id,
+                    quantity=quantity,
+                    usage_status_id=UsageStatus.NEEDED,
+                    delivery_method_id=DeliveryMethod.SHIP_TO_TECH,
+                )
+                self.part_added.emit(part_number)
+                added_count += 1
+            except Exception as exc:
+                self.part_failed.emit(part_number, str(exc))
+                failed_count += 1
+                logger.exception("Failed to add part %s to call %s", part_number, self._selected_call_id)
+
+        self.finished.emit(
+            f"Added {added_count} part(s), {failed_count} failed "
+            f"to call {self._selected_call_id}"
+        )
+
 
 @dataclass
 class BulkConfig:

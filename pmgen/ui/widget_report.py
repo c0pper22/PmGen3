@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QPushButton,
     QScrollArea,
     QSizePolicy,
     QTableWidget,
@@ -272,6 +273,7 @@ class WidgetReportView(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._data: SingleReportData | None = None
+        self.on_add_parts_to_call: Callable[[], None] | None = None
 
         # Scroll area wrapping the whole content
         self._scroll = QScrollArea(self)
@@ -798,6 +800,33 @@ class WidgetReportView(QWidget):
 
         if not over and not thr:
             return
+
+        # ── "Add Parts to Call" button (shown when callback is wired) ──
+        if self.on_add_parts_to_call is not None:
+            rp = _corner_radii()
+            btn_row = QHBoxLayout()
+            btn_row.setContentsMargins(0, 0, 0, 0)
+            btn_add = QPushButton("Add Parts to Call")
+            btn_add.setToolTip("Log into RemoteTech and add these parts to an active call")
+            btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_add.setStyleSheet(
+                f"QPushButton {{"
+                f"  background-color: {colors['primary'].name()};"
+                f"  color: {colors['primary_text'].name()};"
+                f"  border: none;"
+                f"  border-radius: {rp['md']}px;"
+                f"  padding: 6px 16px;"
+                f"  font-size: 12px;"
+                f"  font-weight: 600;"
+                f"}}"
+                f"QPushButton:hover {{"
+                f"  background-color: {colors['accent'].name()};"
+                f"}}"
+            )
+            btn_add.clicked.connect(self.on_add_parts_to_call)
+            btn_row.addWidget(btn_add)
+            btn_row.addStretch()
+            parent.addLayout(btn_row)
 
         def _parts_table(entries, title: str):
             def _copy_parts():
