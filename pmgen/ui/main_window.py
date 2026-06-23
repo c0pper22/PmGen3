@@ -1233,7 +1233,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         )
 
         REMOTETECH_BIN_KEY = "remotetech/bin_id"
-        REMOTETECH_WAREHOUSE_KEY = "remotetech/warehouse_id"
 
         dlg = FramelessDialog(self, "Link RemoteTech", self._icon_dir)
 
@@ -1258,12 +1257,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         bin_in.setValue(QSettings().value(REMOTETECH_BIN_KEY, 1, int))
         bin_in.setToolTip("BIN ID (positive integer)")
 
-        warehouse_in = QSpinBox(dlg)
-        warehouse_in.setObjectName("DialogInput")
-        warehouse_in.setRange(1, 999999)
-        warehouse_in.setValue(QSettings().value(REMOTETECH_WAREHOUSE_KEY, 1, int))
-        warehouse_in.setToolTip("WAREHOUSE ID (positive integer)")
-
         status_lbl = QLabel("", dlg)
         status_lbl.setObjectName("DialogLabel")
         status_lbl.setWordWrap(True)
@@ -1280,7 +1273,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             try:
                 save_remotetech_credentials(u, p)
                 QSettings().setValue(REMOTETECH_BIN_KEY, bin_in.value())
-                QSettings().setValue(REMOTETECH_WAREHOUSE_KEY, warehouse_in.value())
                 status_lbl.setText("RemoteTech credentials saved.")
                 logging.info("RemoteTech credentials saved for user: %s", u)
             except Exception as exc:
@@ -1295,9 +1287,7 @@ class MainWindow(WindowResizeMixin, QMainWindow):
                 u_in.clear()
                 p_in.clear()
                 bin_in.setValue(1)
-                warehouse_in.setValue(1)
                 QSettings().remove(REMOTETECH_BIN_KEY)
-                QSettings().remove(REMOTETECH_WAREHOUSE_KEY)
                 status_lbl.setText("RemoteTech credentials removed.")
                 logging.info("RemoteTech credentials removed")
             except Exception as exc:
@@ -1313,8 +1303,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         dlg._content_layout.addWidget(p_in)
         dlg._content_layout.addWidget(QLabel("BIN ID", dlg))
         dlg._content_layout.addWidget(bin_in)
-        dlg._content_layout.addWidget(QLabel("WAREHOUSE ID", dlg))
-        dlg._content_layout.addWidget(warehouse_in)
         dlg._content_layout.addWidget(status_lbl)
         row = QHBoxLayout()
         row.addWidget(btn_remove)
@@ -1346,7 +1334,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             return
 
         bin_id = QSettings().value("remotetech/bin_id", 1, int)
-        warehouse_id = QSettings().value("remotetech/warehouse_id", 1, int)
 
         # Gather parts from the cached report data
         data = getattr(self, '_cached_report_data', None)
@@ -1377,7 +1364,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             username=username,
             password=password,
             bin_id=bin_id,
-            warehouse_id=warehouse_id,
             part_entries=part_entries,
         )
         self._rt_phase1_worker.moveToThread(self._rt_phase1_thread)
@@ -1484,7 +1470,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
         username = get_remotetech_username() or ""
         password = get_remotetech_password() or ""
         bin_id = QSettings().value("remotetech/bin_id", 1, int)
-        warehouse_id = QSettings().value("remotetech/warehouse_id", 1, int)
 
         data = getattr(self, '_cached_report_data', None)
         if data is None:
@@ -1509,7 +1494,6 @@ class MainWindow(WindowResizeMixin, QMainWindow):
             username=username,
             password=password,
             bin_id=bin_id,
-            warehouse_id=warehouse_id,
             part_entries=part_entries,
             selected_call_id=call.call_id,
         )

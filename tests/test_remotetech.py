@@ -191,7 +191,6 @@ def test_add_part_to_call_success(monkeypatch) -> None:
         call_id="42918",
         item_id=5425,
         bin_id=130,
-        warehouse_id=42,
         quantity=3,
     )
 
@@ -228,7 +227,6 @@ def test_add_part_to_call_empty_response(monkeypatch) -> None:
             call_id="42918",
             item_id=5425,
             bin_id=130,
-            warehouse_id=42,
         )
 
 
@@ -254,7 +252,7 @@ class _FakeRemoteTechAPI:
 
         # Track calls for assertions
         self.lookup_calls: list[tuple[str, int | None]] = []  # (part_number, bin_search)
-        self.add_calls: list[tuple[str, int, int, int, int]] = []  # (call_id, item_id, bin_id, warehouse_id, qty)
+        self.add_calls: list[tuple[str, int, int, int]] = []  # (call_id, item_id, bin_id, qty)
         self.added_parts: list[str] = []
 
     def login(self, username: str, password: str) -> LoginResult:
@@ -285,7 +283,6 @@ class _FakeRemoteTechAPI:
         call_id: str,
         item_id: int,
         bin_id: int,
-        warehouse_id: int,
         quantity: int = 1,
         delivery_method_id: int = 1,
         usage_status_id: int = 1,
@@ -294,7 +291,7 @@ class _FakeRemoteTechAPI:
     ) -> AddedPartResult:
         if call_id in self._add_raises:
             raise self._add_raises[call_id]
-        self.add_calls.append((call_id, item_id, bin_id, warehouse_id, quantity))
+        self.add_calls.append((call_id, item_id, bin_id, quantity))
         # Find the part_number by looking up item_id in results
         pn = "UNKNOWN"
         for k, v in self._lookup_results.items():
@@ -312,7 +309,7 @@ class _FakeRemoteTechAPI:
             bin="Main Bin",
             bin_id=bin_id,
             warehouse="Main WH",
-            warehouse_id=warehouse_id,
+            warehouse_id=1,
             usage_status_code="NEEDED",
             delivery_method_id=3,
             bill=True,
@@ -342,7 +339,6 @@ class TestWorkerRunAddParts:
             username="test",
             password="pass",
             bin_id=130,
-            warehouse_id=42,
             part_entries=[(self.P1, 2), (self.P2, 1), (self.P3, 5)],
             selected_call_id="CALL001",
         )
@@ -378,7 +374,6 @@ class TestWorkerRunAddParts:
             username="test",
             password="pass",
             bin_id=130,
-            warehouse_id=42,
             part_entries=[(self.P1, 1), (self.P2, 1), (self.P3, 1)],
             selected_call_id="CALL001",
         )
@@ -410,7 +405,6 @@ class TestWorkerRunAddParts:
             username="test",
             password="pass",
             bin_id=130,
-            warehouse_id=42,
             part_entries=[(self.P1, 1)],
             selected_call_id="CALL001",
         )
@@ -423,11 +417,10 @@ class TestWorkerRunAddParts:
         assert len(spy_added) == 1
         # Verify the fake API was used and add was called with correct parameters
         assert len(fake_api.add_calls) == 1
-        call_id, item_id, bin_id, wh_id, qty = fake_api.add_calls[0]
+        call_id, item_id, bin_id, qty = fake_api.add_calls[0]
         assert call_id == "CALL001"
         assert item_id == 101
         assert bin_id == 130
-        assert wh_id == 42
         assert qty == 1
 
     def test_login_failure_emits_error(self, qtbot) -> None:
@@ -440,7 +433,6 @@ class TestWorkerRunAddParts:
                 username="bad",
                 password="bad",
                 bin_id=130,
-                warehouse_id=42,
                 part_entries=[(self.P1, 1)],
                 selected_call_id="CALL001",
             )
@@ -471,7 +463,6 @@ class TestWorkerRunAddParts:
             username="test",
             password="pass",
             bin_id=130,
-            warehouse_id=42,
             part_entries=[(self.P1, 1), (self.P2, 1)],
             selected_call_id="CALL001",
         )
@@ -501,7 +492,6 @@ class TestWorkerRunAddParts:
             username="test",
             password="pass",
             bin_id=130,
-            warehouse_id=42,
             # Same part appears 3 times with different quantities
             part_entries=[(self.P1, 2), (self.P1, 1), (self.P1, 5)],
             selected_call_id="CALL001",
@@ -516,7 +506,7 @@ class TestWorkerRunAddParts:
         # Only one add call with summed quantity
         assert len(spy_added) == 1
         assert len(fake_api.add_calls) == 1
-        _, _, _, _, qty = fake_api.add_calls[0]
+        _, _, _, qty = fake_api.add_calls[0]
         assert qty == 8  # 2 + 1 + 5
         assert "Added 1 part(s), 0 failed" in spy_finished[0][0]
 
@@ -533,7 +523,6 @@ class TestWorkerRunAddParts:
             username="test",
             password="pass",
             bin_id=130,
-            warehouse_id=42,
             part_entries=[(self.P1, 1)],
             selected_call_id="CALL001",
         )
@@ -572,7 +561,6 @@ def test_run_login_and_fetch_calls_success(qtbot, monkeypatch) -> None:
             username="test",
             password="pass",
             bin_id=130,
-            warehouse_id=42,
             part_entries=[("P1", 1)],
         )
 
@@ -598,7 +586,6 @@ def test_run_login_and_fetch_calls_login_failure(qtbot, monkeypatch) -> None:
             username="bad",
             password="bad",
             bin_id=130,
-            warehouse_id=42,
             part_entries=[("P1", 1)],
         )
 
@@ -619,7 +606,7 @@ def test_run_login_and_fetch_calls_login_failure(qtbot, monkeypatch) -> None:
 def test_worker_signals_exist() -> None:
     """Smoke test: RemoteTechWorker declares all expected signals."""
     worker = RemoteTechWorker(
-        username="u", password="p", bin_id=1, warehouse_id=1, part_entries=[]
+        username="u", password="p", bin_id=1, part_entries=[]
     )
     assert hasattr(worker, "calls_ready")
     assert hasattr(worker, "part_added")

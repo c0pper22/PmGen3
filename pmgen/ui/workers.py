@@ -124,7 +124,6 @@ class RemoteTechWorker(QObject):
         username: str,
         password: str,
         bin_id: int,
-        warehouse_id: int,
         part_entries: list[tuple[str, int]],  # (part_number, quantity)
         selected_call_id: str = "",
     ):
@@ -132,7 +131,6 @@ class RemoteTechWorker(QObject):
         self._username = username
         self._password = password
         self._bin_id = bin_id
-        self._warehouse_id = warehouse_id
         self._part_entries = part_entries
         self._selected_call_id = selected_call_id
         self._api: object | None = None
@@ -185,7 +183,7 @@ class RemoteTechWorker(QObject):
             try:
                 # Search all bins + Inventory (not just the user's current bin)
                 # so every part resolves to an ItemID; the part is still added
-                # to the configured bin/warehouse below.
+                # to the configured bin below.
                 lookup = api.part_number_lookup(part_number, bin_search=False)
                 if lookup is None:
                     self.part_failed.emit(part_number, "Part not found in RemoteTech")
@@ -196,7 +194,6 @@ class RemoteTechWorker(QObject):
                     call_id=self._selected_call_id,
                     item_id=lookup.item_id,
                     bin_id=self._bin_id,
-                    warehouse_id=self._warehouse_id,
                     quantity=quantity,
                     usage_status_id=UsageStatus.NEEDED,
                     delivery_method_id=DeliveryMethod.SHIP_TO_TECH,

@@ -553,7 +553,6 @@ class RemoteTechAPI:
         call_id: str,
         item_id: int,
         bin_id: int,
-        warehouse_id: int,
         quantity: int = 1,
         delivery_method_id: int = DeliveryMethod.PICK_UP,
         usage_status_id: int = UsageStatus.USED,
@@ -572,8 +571,6 @@ class RemoteTechAPI:
             ``ItemID`` from a ``PartLookupResult``.
         bin_id : int
             The bin ID (e.g. 130).
-        warehouse_id : int
-            The warehouse ID (e.g. 42).
         quantity : int
             Quantity to add (default 1).
         delivery_method_id : int
@@ -604,7 +601,6 @@ class RemoteTechAPI:
             "Price": {},
             "Quantity": quantity,
             "BinID": bin_id,
-            "WarehouseID": warehouse_id,
             "DeliveryMethodID": delivery_method_id,
             "UsageStatusID": usage_status_id,
             "Bill": bill,
@@ -662,7 +658,6 @@ class RemoteTechAPI:
         part_number: str,
         description: str,
         bin_id: int,
-        warehouse_id: int,
         quantity: float = 1,
         usage_status_id: int = UsageStatus.USED,
         serial_number: str = "",
@@ -693,8 +688,6 @@ class RemoteTechAPI:
             Part description.
         bin_id : int
             Bin ID.
-        warehouse_id : int
-            Warehouse ID.
         quantity : float
             New quantity (default 1).
         usage_status_id : int
@@ -734,7 +727,6 @@ class RemoteTechAPI:
             "BinID": bin_id,
             "Notes": notes,
             "CallMaterialBinID": call_material_bin_id,
-            "WarehouseID": warehouse_id,
             "Price": {},
             "Discount": discount,
             "Amount": {},
