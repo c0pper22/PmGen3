@@ -10,14 +10,16 @@ from pmgen.rules.grouping import UnitGroupingRule
 from pmgen.rules.qty_override import QtyOverrideRule
 from pmgen.rules.ribon_expansion import RibonExpansionRule
 from pmgen.rules.inventory_check import InventoryCheckRule
+from pmgen.rules.RSDF_detectection import RsdfDetectionRule
 
 PIPELINE = [
-    GenericLifeRule(),    # 1. Calc Life & Due status
-    KitLinkRule(),        # 2. Add Kit Codes
-    UnitGroupingRule(),   # 3. Group by Unit Logic (Drum/Feed Rolls)
-    QtyOverrideRule(),    # 4. Apply Hard Overrides
-    InventoryCheckRule(), # 5. Inventory Check 
-    RibonExpansionRule(), # 6. Resolve Part #
+    GenericLifeRule(),      # 1. Calc Life & Due status
+    KitLinkRule(),          # 2. Add Kit Codes
+    UnitGroupingRule(),     # 3. Group by Unit Logic (Drum/Feed Rolls)
+    RsdfDetectionRule(),    # 4. RSDF/DSDF feed-roll detection (swaps kit)
+    QtyOverrideRule(),      # 5. Apply Hard Overrides
+    InventoryCheckRule(),   # 6. Inventory Check 
+    RibonExpansionRule(),   # 7. Resolve Part #
 ]
 
 def build_context(
@@ -25,6 +27,8 @@ def build_context(
     threshold: float,
     life_basis: str,
     threshold_enabled: bool = True,
+    session: object | None = None,
+    settings_08_bytes: bytes | None = None,
 ) -> Context:
     model = (report.headers or {}).get("model", "")
     counters = report.counters or {}
@@ -43,10 +47,28 @@ def build_context(
         threshold=threshold,
         life_basis=life_basis,
         threshold_enabled=threshold_enabled,
+        meta={
+            "session": session,
+            "settings_08_bytes": settings_08_bytes,
+        },
     )
 
-def run_rules(report, threshold, life_basis, threshold_enabled=True) -> Selection:
-    ctx = build_context(report, threshold, life_basis, threshold_enabled)
+def run_rules(
+    report,
+    threshold,
+    life_basis,
+    threshold_enabled=True,
+    session: object | None = None,
+    settings_08_bytes: bytes | None = None,
+) -> Selection:
+    ctx = build_context(
+        report,
+        threshold,
+        life_basis,
+        threshold_enabled,
+        session=session,
+        settings_08_bytes=settings_08_bytes,
+    )
     
     for rule in PIPELINE:
         try:

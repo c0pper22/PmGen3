@@ -4,7 +4,7 @@ import traceback
 from fnmatch import fnmatchcase
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_csv_bytes, get_unpacking_date
+from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_csv_bytes
 from pmgen.engine.single_report import generate_from_bytes, build_report_data
 from datetime import datetime, date
 import calendar
@@ -37,7 +37,16 @@ class SingleReportWorker(QObject):
         try:
             pm_pdf_bytes = get_service_file_bytes(self.serial, option="PMSupport", sess=self.session)
 
-            unpacking_date = get_unpacking_date(self.serial, sess=self.session)
+            # Fetch 08 Setting Mode data once and reuse it for both the
+            # unpacking date and RSDF/DSDF feed-roll detection.
+            try:
+                blob_08 = get_service_file_bytes(self.serial, option="08", sess=self.session)
+            except Exception:
+                logger.warning(
+                    "Failed to fetch 08 settings for serial %s", self.serial, exc_info=True
+                )
+                blob_08 = None
+            unpacking_date = _parse_unpacking_date_from_08_bytes(blob_08) if blob_08 else None
 
             # Fetch error history (non-fatal: empty list on failure)
             error_records = []
@@ -59,6 +68,8 @@ class SingleReportWorker(QObject):
                 threshold=self.threshold,
                 life_basis=self.life_basis,
                 threshold_enabled=self.threshold_enabled,
+                session=self.session,
+                settings_08_bytes=blob_08,
             )
 
             report_data = build_report_data(
@@ -84,6 +95,8 @@ class SingleReportWorker(QObject):
                 unpacking_date=unpacking_date,
                 alerts_enabled=self.alerts_enabled,
                 customer_name=self.customer_name,
+                session=self.session,
+                settings_08_bytes=blob_08,
             )
 
             self.finished.emit(report_text)
@@ -416,6 +429,7 @@ class BulkRunner(QObject):
                         blob = get_service_file_bytes(serial, "PMSupport", sess=sess)
 
                         unpack_date = None
+                        blob_08 = None
                         custom08_val = ""
                         custom05_val = ""
                         try:
@@ -445,7 +459,13 @@ class BulkRunner(QObject):
                     report = parse_pm_report(blob)
                     model_name = (report.headers or {}).get("model") or "Unknown"
 
-                    selection = run_rules(report, threshold=thr, life_basis=basis, threshold_enabled=thr_enabled)
+                    selection = run_rules(
+                        report,
+                        threshold=thr,
+                        life_basis=basis,
+                        threshold_enabled=thr_enabled,
+                        settings_08_bytes=blob_08,
+                    )
 
                     meta = getattr(selection, "meta", {}) or {}
                     all_items = meta.get("all_items", []) or meta.get("all", []) or getattr(selection, "all_items", []) or []

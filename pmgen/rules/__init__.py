@@ -5,3 +5,4 @@ from .inventory_check import InventoryCheckRule as InventoryCheckRule
 from .kit_link import KitLinkRule as KitLinkRule
 from .qty_override import QtyOverrideRule as QtyOverrideRule
 from .ribon_expansion import RibonExpansionRule as RibonExpansionRule
+from .RSDF_detectection import RsdfDetectionRule as RsdfDetectionRule

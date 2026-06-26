@@ -611,6 +611,8 @@ def generate_from_bytes(
     unpacking_date: Optional[Union[str, date]] = None,
     alerts_enabled: bool = True,
     customer_name: str = "",
+    session: object | None = None,
+    settings_08_bytes: bytes | None = None,
 ) -> str:
     report = parse_pm_report(pm_pdf_bytes)
     selection = run_rules(
@@ -618,6 +620,8 @@ def generate_from_bytes(
         threshold=threshold,
         life_basis=life_basis,
         threshold_enabled=threshold_enabled,
+        session=session,
+        settings_08_bytes=settings_08_bytes,
     )
     return format_report(
         report=report,
