@@ -318,6 +318,36 @@ class BulkRunner(QObject):
             if str(machine_status).strip().lower() == self.cfg.machine_filter
         ]
 
+    def _write_top_n_reports(
+        self, ok: list, *, thr: float, basis: str, show_all: bool,
+        out_dir: str, thr_enabled: bool,
+    ) -> tuple[int, list]:
+        """Write individual PDF reports for the top-N serials ranked by usage.
+
+        ``ok`` must already be sorted by usage (``best_used``) descending. Only
+        the first ``cfg.top_n`` entries are written, honouring the bulk "Number
+        of reports" setting. Returns ``(written, top)`` where ``top`` is the
+        sliced list actually written. A failure on one report does not abort the
+        rest.
+        """
+        from pmgen.engine.single_report import create_pdf_report
+
+        top = ok[: self.cfg.top_n]
+        written = 0
+        for r in top:
+            try:
+                create_pdf_report(
+                    report=r["report"], selection=r["selection"], threshold=thr,
+                    life_basis=basis, show_all=show_all, out_dir=out_dir,
+                    threshold_enabled=thr_enabled,
+                    unpacking_date=r.get("unpacking_date"),
+                    customer_name=r.get("customer_name", ""),
+                )
+                written += 1
+            except Exception as e:
+                logger.warning("Failed to write PDF report for %s: %s", r.get("serial"), e)
+        return written, top
+
     def _check_date_filter(self, d: date) -> str | None:
         """
         Returns a reason string if filtered (e.g., 'Too Old'), or None if allowed.
@@ -369,7 +399,6 @@ class BulkRunner(QObject):
             from pmgen.io.http_client import SessionPool, get_serial_status_map_after_login, get_service_file_bytes
             from pmgen.parsing.parse_pm_report import parse_pm_report
             from pmgen.engine.run_rules import run_rules
-            from pmgen.engine.single_report import create_pdf_report
             from pmgen.engine.final_report import write_final_summary_pdf
 
             # 1. Initialize Pool
@@ -489,14 +518,6 @@ class BulkRunner(QObject):
                             "best_used": float(best_used) # Return value so we can sort if needed
                         }
                     else:
-                        if self.cfg.generate_pdfs:
-                            create_pdf_report(
-                                report=report, selection=selection, threshold=thr, life_basis=basis,
-                                show_all=show_all, out_dir=final_out_dir, threshold_enabled=thr_enabled,
-                                unpacking_date=unpack_date,
-                                customer_name=cust_name
-                            )
-
                         self.item_updated.emit(serial, "Done", pct_str, model_name, d_str, custom08_val, custom05_val, machine_status)
 
                         return {
@@ -510,7 +531,11 @@ class BulkRunner(QObject):
                             "kit_by_pn": meta.get("kit_by_pn", {}) or {},
                             "due_sources": meta.get("due_sources", {}) or {},
                             "unpacking_date": unpack_date,
-                            "filtered": False
+                            "filtered": False,
+                            # Carried so the top-N individual PDF reports can be
+                            # generated after ranking (see _write_top_n_reports).
+                            "report": report,
+                            "selection": selection,
                         }
 
                 except Exception as e:
@@ -560,11 +585,18 @@ class BulkRunner(QObject):
             # Exclude Filtered items from the Final PDF Summary
             ok = [r for r in results if "error" not in r and not r.get("filtered", False)]
             ok.sort(key=lambda r: (r.get("best_used") or 0.0), reverse=True)
-            top = ok[: self.cfg.top_n]
 
-            if len(top) > 0:
+            if ok:
                 if self.cfg.generate_pdfs:
-                    self.progress.emit(f"[Info] Wrote {len(top)} report files to: {final_out_dir}")
+                    # Only the top-N serials (by usage) get individual PDF
+                    # reports, honouring the "Number of reports" setting. This
+                    # runs after ranking because the top N is unknown until every
+                    # serial has been processed.
+                    written, top = self._write_top_n_reports(
+                        ok, thr=thr, basis=basis, show_all=show_all,
+                        out_dir=final_out_dir, thr_enabled=thr_enabled,
+                    )
+                    self.progress.emit(f"[Info] Wrote {written} report files to: {final_out_dir}")
                     try:
                         pdf_path = write_final_summary_pdf(
                             out_dir=final_out_dir, results=results, top=top, thr=thr, basis=basis,
