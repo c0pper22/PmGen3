@@ -29,6 +29,7 @@ from pmgen.canon.regex_tokens import BUILTIN_REGEX_TOKENS, expand_regex_tokens
 from pmgen.io.db_access import CatalogDB
 from pmgen.rules.grouping import UnitGroupingRule
 from pmgen.rules.kit_link import KitLinkRule
+from pmgen.rules.qty_override import QtyOverrideRule
 from pmgen.ui.components import CustomMessageBox, ResizeState
 from pmgen.ui.shell import WindowControlSpec, WindowResizeMixin, build_frameless_top_bar
 from pmgen.ui.theme import SPACING_LG, SPACING_MD
@@ -1135,6 +1136,7 @@ class QtyOverridesTab(_EditorTabBase):
             for unit, qty in current.items():
                 if self._original.get(unit) != qty:
                     self._db.set_qty_override(unit, qty)
+            QtyOverrideRule.clear_cache()
             self.load_data()
         except Exception as ex:
             CustomMessageBox.warn(self, "Save Failed", str(ex), self._icon_dir)

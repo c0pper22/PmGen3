@@ -78,12 +78,16 @@ class UnitGroupingRule(RuleBase):
     def _get_per_color_units(self) -> Set[str]:
         if self._PER_COLOR_CACHE is not None:
             return self._PER_COLOR_CACHE
+        # Assign to the class attribute (not ``self``) so clear_cache() can
+        # invalidate the cache for every instance, including the singleton in
+        # the rules PIPELINE. An instance attribute would shadow the class
+        # attribute and make clear_cache() a no-op for already-loaded instances.
         try:
-            units = CatalogDB().get_per_color_units()
-            self._PER_COLOR_CACHE = set(units)
+            loaded: Set[str] = set(CatalogDB().get_per_color_units())
         except Exception:
-            self._PER_COLOR_CACHE = set()
-        return self._PER_COLOR_CACHE
+            loaded = set()
+        UnitGroupingRule._PER_COLOR_CACHE = loaded
+        return loaded
 
     def apply(self, ctx: Context) -> None:
         seen_buckets: set[tuple[str, str, str]] = set()
