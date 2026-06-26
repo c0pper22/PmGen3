@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 GITHUB_REPO = "c0pper22/PmGen3"
 ASSET_NAME = "PmGen.zip"
-CURRENT_VERSION = "3.1.0"
+CURRENT_VERSION = "3.1.1"
 USER_AGENT = f"PmGen-Updater/{CURRENT_VERSION}"
 UPDATER_EXE_NAME = "updater.exe"
 
