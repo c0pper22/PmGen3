@@ -1,11 +1,12 @@
 import pytest
 from unittest.mock import MagicMock
 from PyQt6.QtCore import Qt, QRegularExpression, QCoreApplication, QSettings
-from PyQt6.QtWidgets import QWidget, QToolBar, QLabel, QComboBox, QVBoxLayout, QPlainTextEdit, QLineEdit, QPushButton
+from PyQt6.QtWidgets import QApplication, QWidget, QToolBar, QLabel, QComboBox, QVBoxLayout, QPlainTextEdit, QLineEdit, QPushButton
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 # Import the classes we want to test
 from pmgen.ui.main_window import MainWindow, BulkRunTab
+from pmgen.ui.factory import SerialLineEdit, UIFactory
 from pmgen.ui.bulk_run import BulkSortFilterProxyModel
 from pmgen.ui.bulk_model import BulkQueueModel
 from pmgen.ui.workers import BulkConfig
@@ -66,6 +67,33 @@ def mock_main_window(qtbot, monkeypatch):
 # =============================================================================
 #  TESTS: BulkSortFilterProxyModel
 # =============================================================================
+
+def test_serial_input_ctrl_v_trims_clipboard_whitespace(qtbot):
+    class StubWindow(QWidget):
+        def _toggle_threshold_enabled(self): pass
+        def _toggle_life_basis(self): pass
+        def _update_threshold_button(self): self._thr_button.setText("Threshold")
+        def _update_basis_button(self): self._basis_button.setText("Basis")
+        def _load_id_history(self): pass
+        def _on_generate_clicked(self): pass
+        def _auto_capitalize(self, text):
+            line_edit = self._id_combo.lineEdit()
+            line_edit.setText(text.upper())
+
+    window = StubWindow()
+    qtbot.addWidget(window)
+    bar = UIFactory("").create_secondary_bar(window)
+    qtbot.addWidget(bar)
+    line_edit = window._id_combo.lineEdit()
+    assert isinstance(line_edit, SerialLineEdit)
+
+    line_edit.setFocus()
+    QApplication.clipboard().setText("ab123\r\n")
+
+    qtbot.keyClick(line_edit, Qt.Key.Key_V, Qt.KeyboardModifier.ControlModifier)
+
+    assert line_edit.text() == "AB123"
+    QApplication.clipboard().clear()
 
 def test_proxy_model_filtering():
     """Test that the search filter correctly matches Serial, Model, or Customer."""

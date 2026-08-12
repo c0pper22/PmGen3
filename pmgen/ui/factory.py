@@ -1,11 +1,11 @@
 from __future__ import annotations
 import sys
 from PyQt6.QtCore import Qt, QRegularExpression
-from PyQt6.QtGui import QAction, QRegularExpressionValidator
+from PyQt6.QtGui import QAction, QKeyEvent, QKeySequence, QRegularExpressionValidator
 from PyQt6.QtWidgets import (
-    QWidget, QToolBar, QToolButton, 
+    QApplication, QWidget, QToolBar, QToolButton,
     QHBoxLayout, QLabel, QMenu, QPushButton, QComboBox, 
-    QCompleter
+    QCompleter, QLineEdit,
 )
 
 from .components import CustomMessageBox
@@ -14,6 +14,19 @@ from .theme import SPACING_MD, SPACING_SM
 from pmgen.updater.updater import CURRENT_VERSION
 
 BORDER_WIDTH = 8
+
+
+class SerialLineEdit(QLineEdit):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if event.matches(QKeySequence.StandardKey.Paste):
+            clipboard = QApplication.clipboard()
+            text = clipboard.text().strip() if clipboard is not None else ""
+            if text:
+                self.insert(text)
+            event.accept()
+            return
+
+        super().keyPressEvent(event)
 
 class UIFactory:
     """
@@ -197,6 +210,7 @@ class UIFactory:
         window._id_combo.setMaxVisibleItems(15) 
         window._id_combo.setMinimumWidth(200)
         window._id_combo.setFixedHeight(32)
+        window._id_combo.setLineEdit(SerialLineEdit(window._id_combo))
 
         le = window._id_combo.lineEdit()
         le.setValidator(QRegularExpressionValidator(QRegularExpression(r"[A-Za-z0-9]*"), window))
