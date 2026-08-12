@@ -5,7 +5,7 @@ from fnmatch import fnmatchcase
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_csv_bytes
-from pmgen.engine.single_report import generate_from_bytes, build_report_data
+from pmgen.engine.single_report import build_report_data, format_report
 from datetime import datetime, date
 import calendar
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
@@ -86,8 +86,9 @@ class SingleReportWorker(QObject):
             )
             self.data_ready.emit(report_data)
 
-            report_text = generate_from_bytes(
-                pm_pdf_bytes=pm_pdf_bytes,
+            report_text = format_report(
+                report=report,
+                selection=selection,
                 threshold=self.threshold,
                 life_basis=self.life_basis,
                 show_all=self.show_all,
@@ -95,8 +96,6 @@ class SingleReportWorker(QObject):
                 unpacking_date=unpacking_date,
                 alerts_enabled=self.alerts_enabled,
                 customer_name=self.customer_name,
-                session=self.session,
-                settings_08_bytes=blob_08,
             )
 
             self.finished.emit(report_text)

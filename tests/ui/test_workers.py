@@ -1,6 +1,9 @@
 import pytest
 from datetime import date
-from pmgen.ui.workers import BulkRunner, BulkConfig
+from importlib import import_module
+from types import SimpleNamespace
+
+from pmgen.ui.workers import BulkConfig, BulkRunner, SingleReportWorker
 
 @pytest.fixture
 def base_config():
@@ -85,6 +88,58 @@ def test_bulk_runner_normalizes_customer_map_keys(base_config):
     )
 
     assert runner.customer_map["INAC67890"] == "Inactive Customer"
+
+
+def test_single_report_worker_processes_report_once(monkeypatch):
+    calls = {"parse": 0, "rules": 0}
+    parse_module = import_module("pmgen.parsing.parse_pm_report")
+    rules_module = import_module("pmgen.engine.run_rules")
+    report = SimpleNamespace(
+        headers={"model": "Model A", "serial": "SN123", "date": "2026-08-12"},
+        counters={},
+        items=[],
+    )
+    selection = SimpleNamespace(items=[], meta={})
+
+    def parse_once(_report_bytes):
+        calls["parse"] += 1
+        return report
+
+    def run_rules_once(*args, **kwargs):
+        calls["rules"] += 1
+        return selection
+
+    monkeypatch.setattr(
+        "pmgen.ui.workers.get_service_file_bytes",
+        lambda serial, option, sess: b"report" if option == "PMSupport" else b"settings",
+    )
+    monkeypatch.setattr("pmgen.ui.workers._parse_unpacking_date_from_08_bytes", lambda blob: None)
+    monkeypatch.setattr("pmgen.io.http_client.fetch_error_history", lambda serial, sess: b"")
+    monkeypatch.setattr("pmgen.io.http_client.parse_error_history_csv", lambda blob: [])
+    monkeypatch.setattr(parse_module, "parse_pm_report", parse_once)
+    monkeypatch.setattr("pmgen.engine.single_report.parse_pm_report", parse_once)
+    monkeypatch.setattr(rules_module, "run_rules", run_rules_once)
+    monkeypatch.setattr("pmgen.engine.single_report.run_rules", run_rules_once)
+
+    worker = SingleReportWorker(
+        session=object(),
+        serial="SN123",
+        threshold=0.8,
+        life_basis="page",
+        show_all=False,
+        threshold_enabled=True,
+        alerts_enabled=True,
+    )
+    completed: list[str] = []
+    errors: list[str] = []
+    worker.finished.connect(completed.append)
+    worker.error.connect(errors.append)
+
+    worker.run()
+
+    assert errors == []
+    assert len(completed) == 1
+    assert calls == {"parse": 1, "rules": 1}
 
 
 def _ok_entry(serial: str, best_used: float) -> dict:
