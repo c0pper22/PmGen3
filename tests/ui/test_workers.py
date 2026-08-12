@@ -1,4 +1,5 @@
 import pytest
+from contextlib import contextmanager
 from datetime import date
 from importlib import import_module
 from types import SimpleNamespace
@@ -88,6 +89,120 @@ def test_bulk_runner_normalizes_customer_map_keys(base_config):
     )
 
     assert runner.customer_map["INAC67890"] == "Inactive Customer"
+
+
+def test_bulk_runner_date_filter_skips_expensive_processing(monkeypatch, qtbot):
+    http_module = import_module("pmgen.io.http_client")
+    parse_module = import_module("pmgen.parsing.parse_pm_report")
+    rules_module = import_module("pmgen.engine.run_rules")
+    service_file_options: list[str] = []
+    calls = {"parse": 0, "rules": 0}
+
+    class FakeSessionPool:
+        def __init__(self, size, callback=None):
+            if callback:
+                callback(1, 1)
+
+        @contextmanager
+        def acquire(self):
+            yield object()
+
+        def close(self):
+            pass
+
+    def get_service_file_bytes(serial, option, sess):
+        service_file_options.append(option)
+        return b"9486, , TOSHIBA e-STUDIO5525AC,"
+
+    def parse_report(_blob):
+        calls["parse"] += 1
+        raise AssertionError("Filtered machine should not parse PM Support")
+
+    def run_rules(*args, **kwargs):
+        calls["rules"] += 1
+        raise AssertionError("Filtered machine should not run rules")
+
+    monkeypatch.setattr(http_module, "SessionPool", FakeSessionPool)
+    monkeypatch.setattr(http_module, "get_serial_status_map_after_login", lambda sess: {"SN123": "Active"})
+    monkeypatch.setattr(http_module, "get_service_file_bytes", get_service_file_bytes)
+    monkeypatch.setattr(parse_module, "parse_pm_report", parse_report)
+    monkeypatch.setattr(rules_module, "run_rules", run_rules)
+    monkeypatch.setattr("pmgen.ui.workers._parse_unpacking_date_from_08_bytes", lambda blob: date(2020, 1, 1))
+
+    runner = BulkRunner(
+        cfg=BulkConfig(generate_pdfs=False, custom_05_code=123),
+        threshold=0.8,
+        life_basis="page",
+        unpack_max_enabled=True,
+        unpack_max_months=12,
+    )
+    updates: list[tuple] = []
+    runner.item_updated.connect(lambda *args: updates.append(args))
+
+    runner.run()
+    qtbot.waitUntil(
+        lambda: any(update[0:2] == ("SN123", "Filtered") for update in updates),
+        timeout=1000,
+    )
+
+    assert service_file_options == ["08"]
+    assert calls == {"parse": 0, "rules": 0}
+    assert any(update[0:2] == ("SN123", "Filtered") for update in updates)
+
+
+def test_bulk_runner_allowed_date_continues_full_processing(monkeypatch):
+    http_module = import_module("pmgen.io.http_client")
+    parse_module = import_module("pmgen.parsing.parse_pm_report")
+    rules_module = import_module("pmgen.engine.run_rules")
+    service_file_options: list[str] = []
+    calls = {"parse": 0, "rules": 0}
+    report = SimpleNamespace(headers={"serial": "SN123", "model": "Model A"})
+    selection = SimpleNamespace(items=[], meta={"all_items": []})
+
+    class FakeSessionPool:
+        def __init__(self, size, callback=None):
+            if callback:
+                callback(1, 1)
+
+        @contextmanager
+        def acquire(self):
+            yield object()
+
+        def close(self):
+            pass
+
+    def get_service_file_bytes(serial, option, sess):
+        service_file_options.append(option)
+        return b"data"
+
+    def parse_report(_blob):
+        calls["parse"] += 1
+        return report
+
+    def run_rules(*args, **kwargs):
+        calls["rules"] += 1
+        return selection
+
+    monkeypatch.setattr(http_module, "SessionPool", FakeSessionPool)
+    monkeypatch.setattr(http_module, "get_serial_status_map_after_login", lambda sess: {"SN123": "Active"})
+    monkeypatch.setattr(http_module, "get_service_file_bytes", get_service_file_bytes)
+    monkeypatch.setattr(parse_module, "parse_pm_report", parse_report)
+    monkeypatch.setattr(rules_module, "run_rules", run_rules)
+    monkeypatch.setattr("pmgen.ui.workers._parse_unpacking_date_from_08_bytes", lambda blob: date.today())
+    monkeypatch.setattr("pmgen.ui.workers._parse_code_from_csv_bytes", lambda code, sub, blob: "value")
+
+    runner = BulkRunner(
+        cfg=BulkConfig(generate_pdfs=False, custom_05_code=123),
+        threshold=0.8,
+        life_basis="page",
+        unpack_max_enabled=True,
+        unpack_max_months=12,
+    )
+
+    runner.run()
+
+    assert service_file_options == ["08", "PMSupport", "05"]
+    assert calls == {"parse": 1, "rules": 1}
 
 
 def test_single_report_worker_processes_report_once(monkeypatch):

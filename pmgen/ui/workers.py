@@ -4,7 +4,12 @@ import traceback
 from fnmatch import fnmatchcase
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from pmgen.io.http_client import get_service_file_bytes, _parse_unpacking_date_from_08_bytes, _parse_code_from_csv_bytes
+from pmgen.io.http_client import (
+    _parse_code_from_csv_bytes,
+    _parse_model_from_08_bytes,
+    _parse_unpacking_date_from_08_bytes,
+    get_service_file_bytes,
+)
 from pmgen.engine.single_report import build_report_data, format_report
 from datetime import datetime, date
 import calendar
@@ -454,8 +459,6 @@ class BulkRunner(QObject):
                 try:
                     # A. Fetch Data
                     with pool.acquire() as sess:
-                        blob = get_service_file_bytes(serial, "PMSupport", sess=sess)
-
                         unpack_date = None
                         blob_08 = None
                         custom08_val = ""
@@ -471,6 +474,23 @@ class BulkRunner(QObject):
                         except Exception:
                             logger.warning(f"Failed to fetch 08 blob for serial {serial}")
                             pass
+
+                        d_str = unpack_date.strftime("%Y-%m-%d") if unpack_date else ""
+                        filter_reason = self._check_date_filter(unpack_date)  # type: ignore[arg-type]
+                        if filter_reason:
+                            model_name = _parse_model_from_08_bytes(blob_08) if blob_08 else "Unknown"
+                            self.item_updated.emit(
+                                serial, "Filtered", self._fmt_pct(None), model_name, d_str,
+                                custom08_val, "", machine_status,
+                            )
+                            return {
+                                "serial": serial,
+                                "filtered": True,
+                                "reason": filter_reason,
+                                "best_used": None,
+                            }
+
+                        blob = get_service_file_bytes(serial, "PMSupport", sess=sess)
 
                         try:
                             if self.cfg.custom_05_code > 0:
@@ -502,41 +522,26 @@ class BulkRunner(QObject):
                     pct_str = self._fmt_pct(best_used)
                     d_str = unpack_date.strftime("%Y-%m-%d") if unpack_date else ""
 
-                    # C. Check Date Filter
-                    filter_reason = self._check_date_filter(unpack_date)  # type: ignore[arg-type]
+                    self.item_updated.emit(serial, "Done", pct_str, model_name, d_str, custom08_val, custom05_val, machine_status)
 
-                    if filter_reason:
-                        # FILTERED: Update UI with percentage, but mark as filtered.
-                        # We do NOT generate the individual PDF report.
-                        self.item_updated.emit(serial, "Filtered", pct_str, model_name, d_str, custom08_val, custom05_val, machine_status)
-                        
-                        return {
-                            "serial": serial,
-                            "filtered": True,
-                            "reason": filter_reason,
-                            "best_used": float(best_used) # Return value so we can sort if needed
-                        }
-                    else:
-                        self.item_updated.emit(serial, "Done", pct_str, model_name, d_str, custom08_val, custom05_val, machine_status)
-
-                        return {
-                            "serial": (report.headers or {}).get("serial") or serial,
-                            "model": model_name,
-                            "best_used": float(best_used),
-                            "text": "None",
-                            "customer_name": cust_name, 
-                            "machine_status": machine_status,
-                            "grouped": meta.get("selection_pn_grouped", {}) or {},
-                            "flat": meta.get("selection_pn", {}) or {},
-                            "kit_by_pn": meta.get("kit_by_pn", {}) or {},
-                            "due_sources": meta.get("due_sources", {}) or {},
-                            "unpacking_date": unpack_date,
-                            "filtered": False,
-                            # Carried so the top-N individual PDF reports can be
-                            # generated after ranking (see _write_top_n_reports).
-                            "report": report,
-                            "selection": selection,
-                        }
+                    return {
+                        "serial": (report.headers or {}).get("serial") or serial,
+                        "model": model_name,
+                        "best_used": float(best_used),
+                        "text": "None",
+                        "customer_name": cust_name,
+                        "machine_status": machine_status,
+                        "grouped": meta.get("selection_pn_grouped", {}) or {},
+                        "flat": meta.get("selection_pn", {}) or {},
+                        "kit_by_pn": meta.get("kit_by_pn", {}) or {},
+                        "due_sources": meta.get("due_sources", {}) or {},
+                        "unpacking_date": unpack_date,
+                        "filtered": False,
+                        # Carried so the top-N individual PDF reports can be
+                        # generated after ranking (see _write_top_n_reports).
+                        "report": report,
+                        "selection": selection,
+                    }
 
                 except Exception as e:
                     self.item_updated.emit(serial, "Failed", str(e), "", "", "", "", machine_status)
