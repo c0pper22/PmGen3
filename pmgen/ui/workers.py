@@ -526,6 +526,7 @@ class BulkRunner(QObject):
                             "best_used": float(best_used),
                             "text": "None",
                             "customer_name": cust_name, 
+                            "machine_status": machine_status,
                             "grouped": meta.get("selection_pn_grouped", {}) or {},
                             "flat": meta.get("selection_pn", {}) or {},
                             "kit_by_pn": meta.get("kit_by_pn", {}) or {},

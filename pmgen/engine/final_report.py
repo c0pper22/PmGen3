@@ -132,7 +132,7 @@ def _make_toc_grid(toc_rows, text_style, cols=4):
     
     col_width = (7.0 / cols) * inch
 
-    for index, (serial, model, score, unpack_str) in enumerate(toc_rows):
+    for index, (serial, model, score, unpack_str, machine_status) in enumerate(toc_rows):
         base_color = _pct_color(score)
         bg_color = colors.Color(base_color.red, base_color.green, base_color.blue, alpha=0.3)
         
@@ -140,8 +140,9 @@ def _make_toc_grid(toc_rows, text_style, cols=4):
         muted_hex = "#6B7280"
         
         extra = f'<br/><font size="7" color="{muted_hex}">Unpacked: {unpack_str}</font>' if unpack_str else ""
+        serial_label = f"(*) {serial}" if str(machine_status).strip().lower() == "inactive" else serial
         link_text = (
-            f'<a href="#{serial}" color="{text_hex}"><u>{serial}</u></a> '
+            f'<a href="#{serial}" color="{text_hex}"><u>{serial_label}</u></a> '
             f'<font size="8" color="{text_hex}"><b>({score:.0f}%)</b></font>{extra}'
         )
         
@@ -226,8 +227,9 @@ def write_final_summary_pdf(
         
         unpacking_date = r.get("unpacking_date")
         unpack_str = str(unpacking_date) if unpacking_date else ""
+        machine_status = r.get("machine_status", "")
 
-        toc_data.append((serial, model, best_used, unpack_str))
+        toc_data.append((serial, model, best_used, unpack_str, machine_status))
 
         c = _pct_color(best_used)
         hexcolor = f"#{int(c.red*255):02X}{int(c.green*255):02X}{int(c.blue*255):02X}"

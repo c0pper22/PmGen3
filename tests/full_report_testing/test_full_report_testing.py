@@ -5,7 +5,8 @@ import pytest
 import shutil
 from PyQt6.QtCore import QStandardPaths, QCoreApplication
 from pmgen.engine.single_report import generate_from_bytes
-from pmgen.engine.final_report import write_final_summary_pdf
+from pmgen.engine.final_report import _make_toc_grid, write_final_summary_pdf
+from reportlab.lib.styles import getSampleStyleSheet
 from pmgen.parsing.parse_pm_report import parse_pm_report
 from pmgen.engine.run_rules import run_rules
 
@@ -181,3 +182,16 @@ def test_write_final_summary_pdf_empty_input_regression(tmp_path):
     assert os.path.exists(out_path), "Final summary PDF file was not created"
     with open(out_path, "rb") as f:
         assert f.read(4) == b"%PDF", "Generated file is not a valid PDF header"
+
+
+def test_final_summary_quick_links_mark_inactive_serials():
+    toc_grid = _make_toc_grid(
+        [
+            ("INAC67890", "Model A", 90.0, "", "Inactive"),
+            ("ACTV12345", "Model B", 80.0, "", "Active"),
+        ],
+        getSampleStyleSheet()["BodyText"],
+    )
+
+    assert toc_grid._cellvalues[0][0].getPlainText().startswith("(*) INAC67890")
+    assert toc_grid._cellvalues[0][1].getPlainText().startswith("ACTV12345")
