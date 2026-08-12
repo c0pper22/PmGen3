@@ -9,13 +9,13 @@ class InventoryCheckRule(RuleBase):
     name = "InventoryCheckRule"
 
     def apply(self, ctx: Context) -> None:
-        from pmgen.ui.inventory import load_inventory_cache
+        from pmgen.ui.inventory import load_inventory_snapshot
         
         # 1. Load data
-        df = load_inventory_cache()
+        inventory = load_inventory_snapshot()
         
         # If inventory is empty/missing, EVERYTHING is missing
-        if df.empty:
+        if inventory.is_empty:
             missing = []
             for item_code, qty_needed in ctx.kit_selection.items():
                 missing.append({
@@ -33,20 +33,14 @@ class InventoryCheckRule(RuleBase):
         # 2. Iterate through current selection
         for item_code, qty_needed in ctx.kit_selection.items():
             
-            key = item_code.strip().upper()
-            
             # 3. Look up in Inventory (Exact or Contains)
-            match = df[ 
-                (df['Part Number'] == key) | 
-                (df['Unit Name'].str.contains(key, case=False, regex=False, na=False)) 
-            ]
+            match = inventory.find_match(item_code)
 
             qty_on_hand = 0.0
             matched_name = None
 
-            if not match.empty:
-                qty_on_hand = float(match.iloc[0]['Quantity'])
-                matched_name = str(match.iloc[0]['Unit Name'])
+            if match is not None:
+                qty_on_hand, matched_name = match
 
             # 4. Compare Needed vs On Hand
             if qty_on_hand >= qty_needed:

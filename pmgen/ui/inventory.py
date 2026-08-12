@@ -1,5 +1,8 @@
 import os
 import io
+import tempfile
+import threading
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from pmgen.system.wrappers import safe_slot
@@ -15,6 +18,64 @@ from .theme import SPACING_MD, SPACING_SM
 from .widgets import configure_table_view, make_card
 
 
+@dataclass(frozen=True)
+class InventorySnapshot:
+    dataframe: pd.DataFrame
+    _exact_part_rows: dict[str, int]
+    _unit_names: tuple[str, ...]
+
+    @classmethod
+    def from_dataframe(cls, dataframe: pd.DataFrame) -> "InventorySnapshot":
+        normalized = dataframe.copy()
+        if "Quantity" in normalized.columns:
+            normalized["Quantity"] = pd.to_numeric(normalized["Quantity"], errors="coerce").fillna(0)
+        if "Part Number" in normalized.columns:
+            normalized["Part Number"] = normalized["Part Number"].astype(str).str.strip().str.upper()
+        if "Unit Name" in normalized.columns:
+            normalized["Unit Name"] = normalized["Unit Name"].astype(str).str.strip().str.upper()
+
+        exact_part_rows: dict[str, int] = {}
+        if "Part Number" in normalized.columns:
+            for row_index, part_number in enumerate(normalized["Part Number"]):
+                if part_number:
+                    exact_part_rows.setdefault(str(part_number), row_index)
+
+        if "Unit Name" in normalized.columns:
+            unit_names = tuple(str(value) for value in normalized["Unit Name"])
+        else:
+            unit_names = tuple("" for _ in range(len(normalized)))
+
+        return cls(normalized, exact_part_rows, unit_names)
+
+    @property
+    def is_empty(self) -> bool:
+        return self.dataframe.empty
+
+    def find_match(self, item_code: str) -> tuple[float, str] | None:
+        key = (item_code or "").strip().upper()
+        if not key or self.dataframe.empty or "Quantity" not in self.dataframe.columns:
+            return None
+
+        matching_row = self._exact_part_rows.get(key)
+        search_limit = matching_row if matching_row is not None else len(self._unit_names)
+        for row_index, unit_name in enumerate(self._unit_names[:search_limit]):
+            if key in unit_name:
+                matching_row = row_index
+                break
+
+        if matching_row is None:
+            return None
+
+        row = self.dataframe.iloc[matching_row]
+        unit_name = str(row.get("Unit Name", ""))
+        return float(row["Quantity"]), unit_name
+
+
+_INVENTORY_CACHE_LOCK = threading.RLock()
+_INVENTORY_CACHE_SIGNATURE: tuple[str, int | None, int | None] | None = None
+_INVENTORY_CACHE_SNAPSHOT: InventorySnapshot | None = None
+
+
 def get_cache_path():
     """Returns the standardized path to the inventory CSV."""
     base_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
@@ -22,31 +83,78 @@ def get_cache_path():
         os.makedirs(base_dir)
     return os.path.join(base_dir, "inventory_cache.csv")
 
+
+def invalidate_inventory_cache() -> None:
+    global _INVENTORY_CACHE_SIGNATURE, _INVENTORY_CACHE_SNAPSHOT
+    with _INVENTORY_CACHE_LOCK:
+        _INVENTORY_CACHE_SIGNATURE = None
+        _INVENTORY_CACHE_SNAPSHOT = None
+
+
+def load_inventory_snapshot() -> InventorySnapshot:
+    global _INVENTORY_CACHE_SIGNATURE, _INVENTORY_CACHE_SNAPSHOT
+    path = get_cache_path()
+    try:
+        stat = os.stat(path)
+        signature = (path, stat.st_mtime_ns, stat.st_size)
+    except FileNotFoundError:
+        signature = (path, None, None)
+    except OSError as e:
+        print(f"Error checking inventory cache: {e}")
+        with _INVENTORY_CACHE_LOCK:
+            if _INVENTORY_CACHE_SNAPSHOT is not None:
+                return _INVENTORY_CACHE_SNAPSHOT
+        return InventorySnapshot.from_dataframe(pd.DataFrame())
+
+    with _INVENTORY_CACHE_LOCK:
+        if _INVENTORY_CACHE_SIGNATURE == signature and _INVENTORY_CACHE_SNAPSHOT is not None:
+            return _INVENTORY_CACHE_SNAPSHOT
+
+        if signature[1] is None:
+            snapshot = InventorySnapshot.from_dataframe(pd.DataFrame())
+        else:
+            try:
+                snapshot = InventorySnapshot.from_dataframe(pd.read_csv(path))
+            except Exception as e:
+                print(f"Error loading inventory cache: {e}")
+                if _INVENTORY_CACHE_SNAPSHOT is not None:
+                    return _INVENTORY_CACHE_SNAPSHOT
+                return InventorySnapshot.from_dataframe(pd.DataFrame())
+
+        _INVENTORY_CACHE_SIGNATURE = signature
+        _INVENTORY_CACHE_SNAPSHOT = snapshot
+        return snapshot
+
+
 def load_inventory_cache() -> pd.DataFrame:
     """
     Loads the inventory dataframe from disk. 
     Used by both the UI and the Rules Engine.
     """
-    path = get_cache_path()
-    if not os.path.exists(path):
-        return pd.DataFrame()
-    
-    try:
-        df = pd.read_csv(path)
-        # Ensure numeric types for calculation
-        if "Quantity" in df.columns:
-            df["Quantity"] = pd.to_numeric(df["Quantity"], errors='coerce').fillna(0)
-        
-        # Clean up string columns for matching
-        if "Part Number" in df.columns:
-            df["Part Number"] = df["Part Number"].astype(str).str.strip().str.upper()
-        if "Unit Name" in df.columns:
-            df["Unit Name"] = df["Unit Name"].astype(str).str.strip().str.upper()
-            
-        return df
-    except Exception as e:
-        print(f"Error loading inventory cache: {e}")
-        return pd.DataFrame()
+    return load_inventory_snapshot().dataframe.copy(deep=True)
+
+
+def save_inventory_cache(dataframe: pd.DataFrame, path: str | None = None) -> None:
+    global _INVENTORY_CACHE_SIGNATURE, _INVENTORY_CACHE_SNAPSHOT
+    destination = path or get_cache_path()
+    directory = os.path.dirname(destination) or "."
+    os.makedirs(directory, exist_ok=True)
+
+    with _INVENTORY_CACHE_LOCK:
+        file_descriptor, temporary_path = tempfile.mkstemp(
+            prefix="inventory_cache_",
+            suffix=".csv.tmp",
+            dir=directory,
+        )
+        os.close(file_descriptor)
+        try:
+            dataframe.to_csv(temporary_path, index=False)
+            os.replace(temporary_path, destination)
+            _INVENTORY_CACHE_SIGNATURE = None
+            _INVENTORY_CACHE_SNAPSHOT = None
+        finally:
+            if os.path.exists(temporary_path):
+                os.remove(temporary_path)
 
 class InventoryModel(QAbstractTableModel):
     """
@@ -337,7 +445,7 @@ class InventoryTab(QWidget):
         if df is not None:
             try:
                 path = self._get_cache_path()
-                df.to_csv(path, index=False)
+                save_inventory_cache(df, path)
             except Exception as e:
                 print(f"Failed to autosave inventory: {e}")
 
